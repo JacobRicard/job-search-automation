@@ -74,10 +74,16 @@ async function run() {
   // Skip ATS resolution for alternate-platform jobs already in the DB (title+company match).
   // They were processed on a previous run; re-resolving them is wasted network work and Gemini calls.
   const existing = getExistingJobKeys(db);
+  // Also skip jobs whose resolution outcome was already cached (unsupported/unresolved jobs are
+  // never inserted into the jobs table, so title+company dedup can't catch them — without this
+  // cache they'd trigger a Gemini call on every run).
+  const resolvedJobIds = new Set(db.prepare('SELECT job_id FROM ats_resolution_cache').pluck().all());
   const needsResolution = scrapedRaw.filter((j) => {
     if (isPrimaryPlatform(j.platform)) return true;
     const key = (j.title || '').trim().toLowerCase() + '|||' + (j.company || '').trim().toLowerCase();
-    return !existing.has(key);
+    if (existing.has(key)) return false;
+    if (resolvedJobIds.has(j.id)) return false;
+    return true;
   });
   const { jobs: scraped, report: atsResolutionReport } = await normalizeScrapedJobs(needsResolution, { log, useGemini: true });
   if (atsResolutionReport.length) {
@@ -86,6 +92,13 @@ async function run() {
       unsupported: atsResolutionReport.filter((row) => row.action === 'skipped-unsupported').length,
       unresolved: atsResolutionReport.filter((row) => row.action === 'unresolved').length,
     });
+    const insertCacheEntry = db.prepare('INSERT OR IGNORE INTO ats_resolution_cache (job_id, outcome) VALUES (?, ?)');
+    const populateCache = db.transaction(() => {
+      for (const entry of atsResolutionReport) {
+        if (entry.id) insertCacheEntry.run(entry.id, entry.action);
+      }
+    });
+    populateCache();
   }
   const insertAndDedup = db.transaction((scraped) => {
     let skipped = 0;
