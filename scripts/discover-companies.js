@@ -131,6 +131,14 @@ async function main() {
     total: allTracked.size,
   });
 
+  // Skip if discovery ran successfully within the last 23 hours
+  const DISCOVER_TTL_MS = 23 * 60 * 60 * 1000;
+  if (suggested.updatedAt && Date.now() - new Date(suggested.updatedAt).getTime() < DISCOVER_TTL_MS) {
+    const ageHours = ((Date.now() - new Date(suggested.updatedAt).getTime()) / 3_600_000).toFixed(1);
+    log.info('Discovery cache fresh, skipping', { ageHours: Number(ageHours) });
+    process.exit(0);
+  }
+
   // Load context snippet from profile
   let contextSnippet = '';
   try {
@@ -143,7 +151,7 @@ async function main() {
   log.info('Calling Gemini for company suggestions');
   let raw;
   try {
-    raw = await callGemini(buildPrompt(allTracked, contextSnippet), 2, 2000);
+    raw = await callGemini(buildPrompt(allTracked, contextSnippet), 0, 2000);
   } catch (err) {
     log.error('Gemini call failed', { error: err.message });
     process.exit(0);
@@ -160,6 +168,8 @@ async function main() {
 
   if (novel.length === 0) {
     log.info('No new company candidates — nothing to verify');
+    suggested.updatedAt = new Date().toISOString();
+    saveSuggested(profileDir, suggested);
     process.exit(0);
   }
 
@@ -187,6 +197,8 @@ async function main() {
 
   if (verified.length === 0) {
     log.info('No verified boards — suggested-companies.json unchanged');
+    suggested.updatedAt = new Date().toISOString();
+    saveSuggested(profileDir, suggested);
     process.exit(0);
   }
 

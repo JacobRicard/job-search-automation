@@ -568,6 +568,21 @@ function atsBatches() {
 
 async function main(argv = process.argv.slice(2)) {
   const options = parseArgs(argv);
+
+  // Skip if slug-health.json was written within the last 23 hours (same pattern as market-research)
+  const SLUG_HEALTH_TTL_MS = 23 * 60 * 60 * 1000;
+  const jsonPath = path.join(__dirname, '../slug-health.json');
+  if (!options.filterAts) {
+    try {
+      const prev = JSON.parse(fs.readFileSync(jsonPath, 'utf8'));
+      if (prev.timestamp && Date.now() - new Date(prev.timestamp).getTime() < SLUG_HEALTH_TTL_MS) {
+        const ageHours = ((Date.now() - new Date(prev.timestamp).getTime()) / 3_600_000).toFixed(1);
+        log.info('Slug health cache fresh, skipping', { ageHours: Number(ageHours) });
+        process.exit(0);
+      }
+    } catch {}
+  }
+
   const issueBuckets = { broken: [], blocked: [], transient: [] };
   const byAts = {};
   const profileDir = activeProfileDir();
@@ -609,7 +624,6 @@ async function main(argv = process.argv.slice(2)) {
     blocked: issueBuckets.blocked,
     transient: issueBuckets.transient,
   };
-  const jsonPath = path.join(__dirname, '../slug-health.json');
   fs.writeFileSync(jsonPath, JSON.stringify(summary, null, 2));
   console.log(`\nWrote ${jsonPath}`);
   log.info('ATS slug validation run complete', {
