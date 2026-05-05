@@ -80,6 +80,16 @@ function parseResume(md) {
 
     const lastEntry = current.entries[current.entries.length - 1];
 
+    // Sub-role line: **Title** | Date  (must check before the date check)
+    const subroleMatch = line.match(/^\*\*(.+?)\*\*\s*\|\s*(.+)$/);
+    if (subroleMatch) {
+      if (lastEntry && lastEntry.type === 'job') {
+        if (!lastEntry.subroles) lastEntry.subroles = [];
+        lastEntry.subroles.push({ title: subroleMatch[1].trim(), date: subroleMatch[2].trim(), bullets: [] });
+      }
+      continue;
+    }
+
     // **Date** line (bold date after job header)
     if (/^\*\*[A-Z][a-z]/.test(line) || /^\*\*[A-Z][a-z0-9 –-]+\*\*$/.test(line)) {
       if (lastEntry && lastEntry.type === 'job') {
@@ -100,7 +110,12 @@ function parseResume(md) {
     if (/^[-*]\s/.test(line)) {
       const text = line.replace(/^[-*]\s/, '').trim();
       if (lastEntry && lastEntry.type === 'job') {
-        lastEntry.bullets.push(text);
+        const subroles = lastEntry.subroles;
+        if (subroles && subroles.length > 0) {
+          subroles[subroles.length - 1].bullets.push(text);
+        } else {
+          lastEntry.bullets.push(text);
+        }
       } else {
         // Bullets directly in section (e.g., Summary isn't really bullets but just in case)
         current.entries.push({ type: 'bullet', text });
@@ -240,6 +255,16 @@ function buildHtml(resume, profileCss = loadProfileCss()) {
     font-weight: bold;
   }
 
+  /* Sub-role entries within a company block */
+  .subrole-header {
+    margin-top: 4px;
+    margin-left: 0px;
+  }
+  .subrole-title {
+    font-style: italic;
+    font-weight: bold;
+  }
+
 ${profileCss}
 </style>
 </head>
@@ -270,6 +295,21 @@ ${profileCss}
             html += `  <li>${inlineMd(b)}</li>\n`;
           }
           html += `</ul>\n`;
+        }
+        if (entry.subroles && entry.subroles.length > 0) {
+          for (const sr of entry.subroles) {
+            html += `<div class="job-header subrole-header">
+  <span class="job-title-company subrole-title">${inlineMd(sr.title)}</span>
+  <span class="job-date">${inlineMd(sr.date)}</span>
+</div>\n`;
+            if (sr.bullets.length > 0) {
+              html += `<ul>\n`;
+              for (const b of sr.bullets) {
+                html += `  <li>${inlineMd(b)}</li>\n`;
+              }
+              html += `</ul>\n`;
+            }
+          }
         }
       } else if (entry.type === 'skill') {
         html += `<div class="skill-line">${inlineMd(entry.text)}</div>\n`;
