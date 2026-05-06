@@ -103,6 +103,14 @@ node -e "
 const db = require('better-sqlite3')(process.env.JOB_DB_PATH);
 const now = new Date().toISOString();
 db.prepare(\"UPDATE jobs SET status='applied', stage='applied', applied_at=COALESCE(applied_at,?), updated_at=datetime('now') WHERE id=?\").run(now, 'JOB_ID');
+// Write an events row so the Daily Insight modal counts this apply today
+db.prepare(\`
+  INSERT INTO events (job_id, event_type, from_value, to_value)
+  SELECT ?, 'stage_change', 'pending', 'applied'
+  WHERE NOT EXISTS (
+    SELECT 1 FROM events WHERE job_id=? AND event_type='stage_change' AND to_value='applied'
+  )
+\`).run('JOB_ID', 'JOB_ID');
 console.log('marked applied');
 "
 ```
