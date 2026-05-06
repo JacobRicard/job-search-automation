@@ -402,6 +402,7 @@ document.addEventListener('keydown', e => {
     closeCompanyNotes();
     closeAutoApplyAttempt();
     closeApplyImage();
+    closeQuestionsCopy();
     document.getElementById('jd-modal').style.display = 'none';
   }
 });
@@ -550,3 +551,74 @@ document.getElementById('apply-image-modal').addEventListener('click', e => {
   window.pageComparison = function (d) { page = Math.max(0, Math.min(pages - 1, page + d)); show(); };
   show();
 })();
+
+// ---------------------------------------------------------------------------
+// Questions copy modal
+// ---------------------------------------------------------------------------
+
+function closeQuestionsCopy() {
+  document.getElementById('questions-copy-modal').classList.remove('open');
+}
+
+async function copyQA(text, btn) {
+  var orig = btn.textContent;
+  try {
+    if (navigator.clipboard && window.isSecureContext) {
+      await navigator.clipboard.writeText(text);
+    } else {
+      var ta = document.createElement('textarea');
+      ta.value = text;
+      ta.setAttribute('readonly', '');
+      ta.style.position = 'fixed';
+      ta.style.top = '-9999px';
+      document.body.appendChild(ta);
+      ta.focus();
+      ta.select();
+      var ok = document.execCommand('copy');
+      document.body.removeChild(ta);
+      if (!ok) { window.prompt('Copy manually:', text); return; }
+    }
+    btn.textContent = 'Copied!';
+    btn.style.background = 'var(--green)';
+    setTimeout(function () { btn.textContent = orig; btn.style.background = ''; }, 1400);
+  } catch (_) {
+    window.prompt('Copy manually:', text);
+  }
+}
+
+async function openQuestionsCopy(id, title, company) {
+  var modal = document.getElementById('questions-copy-modal');
+  var list = document.getElementById('questions-copy-list');
+  document.getElementById('questions-copy-title').textContent = title;
+  document.getElementById('questions-copy-sub').textContent = company;
+  list.textContent = 'Loading…';
+  modal.classList.add('open');
+  try {
+    var data = await fetch('/job-application-data?id=' + encodeURIComponent(id)).then(function (r) { return r.json(); });
+    var questions = data.questions || [];
+    var answers = data.answers || {};
+    if (!questions.length) {
+      list.innerHTML = '<p style="color:var(--text-muted);font-size:13px;padding:8px 0">No questions found for this job.</p>';
+      return;
+    }
+    list.innerHTML = questions.map(function (q) {
+      var ans = answers[q.name] != null ? String(answers[q.name]) : '';
+      var safeLabel = q.label.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+      var safeAns = ans.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+      var escaped = ans.replace(/\\/g,'\\\\').replace(/'/g,"\\'").replace(/\n/g,'\\n');
+      return '<div class="qcopy-row">'
+        + '<span class="qcopy-label">' + safeLabel + '</span>'
+        + '<div class="qcopy-answer-row">'
+        + '<div class="qcopy-answer">' + (safeAns || '<em style="color:var(--text-muted)">no answer</em>') + '</div>'
+        + (ans ? '<button class="qcopy-btn" onclick="copyQA(\'' + escaped + '\', this)">Copy</button>' : '')
+        + '</div>'
+        + '</div>';
+    }).join('');
+  } catch (_) {
+    list.innerHTML = '<p style="color:var(--red);font-size:13px;padding:8px 0">Failed to load questions.</p>';
+  }
+}
+
+document.getElementById('questions-copy-modal').addEventListener('click', function (e) {
+  if (e.target === document.getElementById('questions-copy-modal')) closeQuestionsCopy();
+});

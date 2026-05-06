@@ -1761,6 +1761,63 @@ td {
   font-weight: 700;
 }
 
+/* ── Questions Copy Modal ────────────────────────────────────────── */
+
+.qcopy-row {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  padding: 10px 0;
+  border-bottom: 1px solid var(--border);
+}
+.qcopy-row:last-child { border-bottom: none; }
+
+.qcopy-answer-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+}
+
+.qcopy-label {
+  display: block;
+  font-size: 11px;
+  flex: 0 0 100%;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  font-weight: 600;
+  margin-bottom: 4px;
+}
+
+.qcopy-answer {
+  flex: 1 1 0;
+  font-size: 13px;
+  line-height: 1.5;
+  color: var(--text-primary);
+  white-space: pre-wrap;
+  word-break: break-word;
+  max-height: 120px;
+  overflow-y: auto;
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: 5px;
+  padding: 6px 8px;
+}
+
+.qcopy-btn {
+  flex: 0 0 auto;
+  align-self: flex-start;
+  background: var(--slate);
+  color: var(--text-secondary);
+  border: none;
+  border-radius: 5px;
+  padding: 5px 10px;
+  font-size: 12px;
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s;
+}
+.qcopy-btn:hover { background: var(--accent); color: white; }
+
 /* ── Notes Modal ─────────────────────────────────────────────────── */
 
 #notes-modal .modal {
