@@ -159,6 +159,7 @@ const server = http.createServer(async (req, res) => {
       if (shouldGzip) headers['Content-Encoding'] = 'gzip';
       res.writeHead(200, headers);
       const stream = fs.createReadStream(filePath);
+      stream.on('error', () => res.destroy());
       if (shouldGzip) {
         stream.pipe(zlib.createGzip()).pipe(res);
       } else {
