@@ -13,6 +13,7 @@ loadDashboardEnv(__dirname);
 const http = require('http');
 const fs = require('fs');
 const path = require('path');
+const zlib = require('zlib');
 
 const { getDb } = require('./lib/db');
 const { DASHBOARD_PORT } = require('./config/constants');
@@ -59,6 +60,16 @@ const MIME_TYPES = {
   '.js': 'application/javascript',
   '.pdf': 'application/pdf',
 };
+
+function clientAcceptsGzip(req) {
+  return /\bgzip\b/.test(req.headers['accept-encoding'] || '');
+}
+
+function staticCacheControl(url) {
+  return url.searchParams.has('v')
+    ? 'public, max-age=31536000, immutable'
+    : 'no-cache';
+}
 
 // ---------------------------------------------------------------------------
 // HTTP server
@@ -139,8 +150,20 @@ const server = http.createServer(async (req, res) => {
     const ext = path.extname(filePath);
     const mime = MIME_TYPES[ext];
     if (mime && fs.existsSync(filePath)) {
-      res.writeHead(200, { 'Content-Type': mime });
-      fs.createReadStream(filePath).pipe(res);
+      const shouldGzip = ['.css', '.js'].includes(ext) && clientAcceptsGzip(req);
+      const headers = {
+        'Content-Type': mime,
+        'Cache-Control': staticCacheControl(url),
+        'Vary': 'Accept-Encoding',
+      };
+      if (shouldGzip) headers['Content-Encoding'] = 'gzip';
+      res.writeHead(200, headers);
+      const stream = fs.createReadStream(filePath);
+      if (shouldGzip) {
+        stream.pipe(zlib.createGzip()).pipe(res);
+      } else {
+        stream.pipe(res);
+      }
       return;
     }
     res.writeHead(404); res.end('not found');

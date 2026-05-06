@@ -63,6 +63,7 @@ function toggleInsights() {
   if (overlay) overlay.classList.toggle('open', isOpen);
   if (btn) btn.classList.toggle('active', isOpen);
   if (isOpen) {
+    if (!window._insightChart && typeof window.initDigestChart === 'function') window.initDigestChart();
     fetch('/api/insights').then(r => r.json()).then(data => {
       const items = drawer.querySelectorAll('.insight-stats .stat-item .stat-n');
       if (items[0] != null) items[0].textContent = data.todayAutoApplied ?? 0;
@@ -269,15 +270,6 @@ async function tailorResume(id, btn) {
     btn.textContent = 'Tailor Resume';
   }
 }
-
-function positionSortThumb() {
-  const active = document.querySelector('.sort-opt.active');
-  const thumb = document.getElementById('sort-thumb');
-  if (!active || !thumb) return;
-  thumb.style.left = active.offsetLeft + 'px';
-  thumb.style.width = active.offsetWidth + 'px';
-}
-window.addEventListener('load', positionSortThumb);
 
 let _applyFiltersTimer = null;
 
