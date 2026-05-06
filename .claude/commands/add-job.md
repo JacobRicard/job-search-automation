@@ -61,7 +61,8 @@ const r = db.prepare(\`
   INSERT OR IGNORE INTO jobs
     (id, title, company, url, platform, location, posted_at, description, status, created_at, updated_at)
   VALUES (?, ?, ?, ?, 'linkedin', ?, ?, ?, 'pending', ?, ?)
-\`).run('ID', 'TITLE', 'COMPANY', URL_OR_NULL, 'LOCATION', 'POSTED_AT', 'DESCRIPTION', now, now);
+\`).run('ID', 'TITLE', 'COMPANY', URL_OR_EMPTY_STRING, 'LOCATION', 'POSTED_AT', 'DESCRIPTION', now, now);
+// Note: url is NOT NULL in the schema — use '' when no URL is available, not null
 console.log(r.changes ? 'inserted' : 'already existed');
 "
 ```
