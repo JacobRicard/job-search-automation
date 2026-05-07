@@ -33,6 +33,9 @@ const SCORE_BORDERLINE = 5;
 const GEMINI_DAILY_LIMIT = 500;
 
 const DAILY_TARGET = 5;
+
+// Auto-ghost: applied jobs with no response after this many days get marked ghosted
+const GHOSTED_AFTER_DAYS = 14;
 const AI_TITLE_KW = /\b(ai|ml|mlops|machine learning|llm|nlp|voice|speech|data science)\b/i;
 const AI_DESC_KW = /ai[\-\s]first|ai mindset|machine learning|mlops|large language model|\bllm\b|generative ai|ai\/ml|neural|deep learning|voice ai|speech.{0,20}(model|ai)|ai platform|ai.{0,10}(company|product|startup)|ai use|ai tools/i;
 
@@ -56,6 +59,7 @@ module.exports = {
   SCORE_BORDERLINE,
   GEMINI_DAILY_LIMIT,
   DAILY_TARGET,
+  GHOSTED_AFTER_DAYS,
   AI_TITLE_KW,
   AI_DESC_KW,
 };
