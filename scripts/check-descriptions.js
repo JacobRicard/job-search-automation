@@ -4,7 +4,7 @@
  * check-descriptions.js
  *
  * Checks today's newly scraped jobs for missing or suspiciously short descriptions.
- * Run after pipeline.js in run-daily.sh.
+ * Run after pipeline.js in the refresh pipeline.
  *
  * Writes jd-health.json for the dashboard banner.
  *

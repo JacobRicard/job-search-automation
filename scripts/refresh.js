@@ -101,14 +101,16 @@ function printUsage() {
   console.log(`Usage: node scripts/refresh.js [flags]
 
 Runs the local MacBook refresh flow for the active profile:
-  scrape -> pipeline -> retry unscored
+  discover -> scrape -> pipeline -> retry unscored
 
-Optional local-only follow-up steps:
+Follow-up steps:
   check descriptions
+  auto-ghost stale applied jobs
   check closed jobs
   refresh market research
   sync rejection emails
   validate ATS slugs
+  update context files
 
 Flags:
   --skip-discover        Skip Gemini company discovery
@@ -153,6 +155,8 @@ function main() {
     runStep(repoRoot, 'Checking description quality', ['scripts/check-descriptions.js'], { optional: true });
   }
 
+  runStep(repoRoot, 'Auto-ghosting stale applied jobs', ['scripts/auto-ghost.js'], { optional: true });
+
   if (!args.skipClosedCheck) {
     runStep(repoRoot, 'Checking for closed jobs', ['scripts/check-closed.js'], { optional: true });
   }
@@ -168,6 +172,8 @@ function main() {
   if (!args.skipSlugCheck) {
     runStep(repoRoot, 'Validating ATS slugs', ['scripts/validate-slugs.js', '--broken-only'], { optional: true });
   }
+
+  runStep(repoRoot, 'Updating context files', ['scripts/update-context.js']);
 
   // Best-effort log retention sweep at end of every run.
   spawnSync(process.execPath, ['scripts/prune-logs.js'], {

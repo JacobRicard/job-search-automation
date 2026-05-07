@@ -9,7 +9,7 @@
     "pipeline": "set -a && . .env && set +a && node pipeline.js",
     "refresh": "node scripts/refresh.js",
     "help": "node scripts/npm-help.js",
-    "daily": "bash scripts/run-daily.sh",
+    "daily": "node scripts/refresh.js",
     "reclassify": "set -a && . .env && set +a && node scripts/reclassify-complexity.js",
     "sync-rejections": "node scripts/sync-rejection-emails.js",
     "retry-unscored": "set -a && . .env && set +a && node scripts/retry-unscored.js",

@@ -52,7 +52,7 @@ describe('npm command docs', () => {
 
     assert.match(output, /NPM Commands/);
     assert.match(output, /npm run daily/);
-    assert.match(output, /Runs the scheduled multi-profile daily workflow/);
+    assert.match(output, /Runs the same full active-profile refresh as npm run refresh/);
     assert.match(output, /npm run apply -- list/);
     assert.match(output, /--min-score=<n>/);
   });

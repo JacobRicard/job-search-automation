@@ -94,7 +94,7 @@ async function scrapeAll() {
   });
 
   // Age filter: keep if new to DB (not in knownIds) OR recently posted.
-  // run-daily.sh writes existing job IDs to /tmp/known_job_ids.json before calling us.
+  // A caller may write existing job IDs to /tmp/known_job_ids.json before scraping.
   let knownIds = new Set();
   try {
     knownIds = new Set(JSON.parse(fs.readFileSync('/tmp/known_job_ids.json', 'utf8')));

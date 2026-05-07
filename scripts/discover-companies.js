@@ -24,12 +24,65 @@ const logPaths                         = require('../lib/log-paths');
 
 const CONCURRENCY   = 5;
 const BOARD_TIMEOUT = 10_000;
+const DEFAULT_DISCOVER_TTL_HOURS = 6;
+const DEFAULT_DISCOVER_CANDIDATE_COUNT = 50;
+const MIN_DISCOVER_OUTPUT_TOKENS = 2000;
 
 const profileDir = process.env.JOB_PROFILE_DIR
   ? path.resolve(repoRoot, process.env.JOB_PROFILE_DIR)
   : path.join(repoRoot, 'profiles', 'example');
 
 const log = createLogger('discover-companies', { logFile: logPaths.daily('discover-companies') });
+
+// ---------------------------------------------------------------------------
+// Runtime configuration
+// ---------------------------------------------------------------------------
+
+function parseNonNegativeNumber(value, fallback) {
+  if (value == null || value === '') return fallback;
+  const n = Number(value);
+  return Number.isFinite(n) && n >= 0 ? n : fallback;
+}
+
+function parsePositiveInteger(value, fallback) {
+  if (value == null || value === '') return fallback;
+  const n = Number(value);
+  return Number.isFinite(n) && n > 0 ? Math.floor(n) : fallback;
+}
+
+function getDiscoveryConfig(env = process.env) {
+  const ttlHours = parseNonNegativeNumber(env.DISCOVER_TTL_HOURS, DEFAULT_DISCOVER_TTL_HOURS);
+  const candidateCount = parsePositiveInteger(env.DISCOVER_CANDIDATE_COUNT, DEFAULT_DISCOVER_CANDIDATE_COUNT);
+  return {
+    ttlHours,
+    ttlMs: ttlHours * 60 * 60 * 1000,
+    candidateCount,
+  };
+}
+
+function getDiscoveryCacheState(updatedAt, ttlMs, nowMs = Date.now()) {
+  const updatedMs = Date.parse(updatedAt || '');
+  if (!updatedAt || Number.isNaN(updatedMs) || ttlMs <= 0) {
+    return { fresh: false, ageHours: null, nextEligibleAt: null };
+  }
+
+  const ageMs = nowMs - updatedMs;
+  return {
+    fresh: ageMs < ttlMs,
+    ageHours: Number((ageMs / 3_600_000).toFixed(1)),
+    nextEligibleAt: new Date(updatedMs + ttlMs).toISOString(),
+  };
+}
+
+function nextEligibleAt(updatedAt, ttlMs) {
+  const updatedMs = Date.parse(updatedAt || '');
+  if (!updatedAt || Number.isNaN(updatedMs) || ttlMs <= 0) return null;
+  return new Date(updatedMs + ttlMs).toISOString();
+}
+
+function getDiscoveryMaxOutputTokens(candidateCount) {
+  return Math.max(MIN_DISCOVER_OUTPUT_TOKENS, candidateCount * 90);
+}
 
 // ---------------------------------------------------------------------------
 // Board existence check
@@ -78,7 +131,7 @@ async function mapConcurrent(items, limit, fn) {
 // Gemini prompt
 // ---------------------------------------------------------------------------
 
-function buildPrompt(existingSlugs, contextSnippet) {
+function buildPrompt(existingSlugs, contextSnippet, candidateCount = DEFAULT_DISCOVER_CANDIDATE_COUNT) {
   const excludeList = [...existingSlugs].slice(0, 300).join(', ');
   return `You are helping find tech companies that hire DevOps/SRE/Platform/Infrastructure engineers.
 
@@ -88,7 +141,7 @@ ${contextSnippet}
 I already track these company board slugs (do NOT suggest any of them):
 ${excludeList}
 
-Suggest 30 NEW companies that are likely to be hiring engineers with these keywords:
+Suggest ${candidateCount} NEW companies that are likely to be hiring engineers with these keywords:
 ${SEARCH_TERMS.join(', ')}
 
 Return strict JSON only — no markdown, no explanation:
@@ -99,7 +152,7 @@ Rules:
 - "slug" is the company's ATS board token (e.g. "stripe", "cloudflare", "hashicorp")
 - Focus on: YC-backed, Series B+, cloud-native infra, fintech, AI infra, dev tooling, security
 - No consulting firms, staffing agencies, or companies that only hire through LinkedIn/Indeed
-- Return exactly 30 candidates`;
+- Return exactly ${candidateCount} candidates`;
 }
 
 // ---------------------------------------------------------------------------
@@ -113,6 +166,7 @@ async function main() {
   }
 
   const t = log.timer();
+  const discoveryConfig = getDiscoveryConfig();
 
   // Build full set of already-tracked slugs
   const staticSlugs = new Set([
@@ -129,13 +183,18 @@ async function main() {
     static: staticSlugs.size,
     suggested: suggestedSlugSet.size,
     total: allTracked.size,
+    ttlHours: discoveryConfig.ttlHours,
+    candidateCount: discoveryConfig.candidateCount,
   });
 
-  // Skip if discovery ran successfully within the last 23 hours
-  const DISCOVER_TTL_MS = 23 * 60 * 60 * 1000;
-  if (suggested.updatedAt && Date.now() - new Date(suggested.updatedAt).getTime() < DISCOVER_TTL_MS) {
-    const ageHours = ((Date.now() - new Date(suggested.updatedAt).getTime()) / 3_600_000).toFixed(1);
-    log.info('Discovery cache fresh, skipping', { ageHours: Number(ageHours) });
+  // Skip if discovery ran recently. DISCOVER_TTL_HOURS=0 forces every refresh to try.
+  const cacheState = getDiscoveryCacheState(suggested.updatedAt, discoveryConfig.ttlMs);
+  if (cacheState.fresh) {
+    log.info('Discovery cache fresh, skipping', {
+      ageHours: cacheState.ageHours,
+      ttlHours: discoveryConfig.ttlHours,
+      nextEligibleAt: cacheState.nextEligibleAt,
+    });
     process.exit(0);
   }
 
@@ -148,10 +207,14 @@ async function main() {
     log.debug('No context.md found in profile dir — continuing without it');
   }
 
-  log.info('Calling Gemini for company suggestions');
+  const maxOutputTokens = getDiscoveryMaxOutputTokens(discoveryConfig.candidateCount);
+  log.info('Calling Gemini for company suggestions', {
+    candidateCount: discoveryConfig.candidateCount,
+    maxOutputTokens,
+  });
   let raw;
   try {
-    raw = await callGemini(buildPrompt(allTracked, contextSnippet), 0, 2000);
+    raw = await callGemini(buildPrompt(allTracked, contextSnippet, discoveryConfig.candidateCount), 0, maxOutputTokens);
   } catch (err) {
     log.error('Gemini call failed', { error: err.message });
     process.exit(0);
@@ -167,9 +230,12 @@ async function main() {
   log.info('Novel candidates after dedup', { count: novel.length });
 
   if (novel.length === 0) {
-    log.info('No new company candidates — nothing to verify');
     suggested.updatedAt = new Date().toISOString();
     saveSuggested(profileDir, suggested);
+    log.info('No new company candidates — nothing to verify', {
+      nextEligibleAt: nextEligibleAt(suggested.updatedAt, discoveryConfig.ttlMs),
+      totalSuggested: allSlugs(suggested).size,
+    });
     process.exit(0);
   }
 
@@ -196,9 +262,12 @@ async function main() {
   }
 
   if (verified.length === 0) {
-    log.info('No verified boards — suggested-companies.json unchanged');
     suggested.updatedAt = new Date().toISOString();
     saveSuggested(profileDir, suggested);
+    log.info('No verified boards — suggested-companies.json unchanged', {
+      nextEligibleAt: nextEligibleAt(suggested.updatedAt, discoveryConfig.ttlMs),
+      totalSuggested: allSlugs(suggested).size,
+    });
     process.exit(0);
   }
 
@@ -222,11 +291,24 @@ async function main() {
   log.info('Discovery complete', {
     added: verified.length,
     totalSuggested: allSlugs(suggested).size,
+    nextEligibleAt: nextEligibleAt(suggested.updatedAt, discoveryConfig.ttlMs),
     ms: t(),
   });
 }
 
-main().catch((err) => {
-  log.error('Unexpected error', { error: err.message, stack: err.stack });
-  process.exit(1);
-});
+if (require.main === module) {
+  main().catch((err) => {
+    log.error('Unexpected error', { error: err.message, stack: err.stack });
+    process.exit(1);
+  });
+}
+
+module.exports = {
+  DEFAULT_DISCOVER_TTL_HOURS,
+  DEFAULT_DISCOVER_CANDIDATE_COUNT,
+  buildPrompt,
+  getDiscoveryConfig,
+  getDiscoveryCacheState,
+  getDiscoveryMaxOutputTokens,
+  nextEligibleAt,
+};

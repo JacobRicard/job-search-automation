@@ -6,7 +6,7 @@
  * Checks whether active pipeline/pending jobs are still open on their source ATS.
  * Marks any that have closed as stage='closed'.
  *
- * Runs as part of the daily pipeline (run-daily.sh).
+ * Runs as part of the refresh pipeline.
  *
  * Platform strategies:
  *   Greenhouse  — native canonical ATS URLs only

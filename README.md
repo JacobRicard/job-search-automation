@@ -30,14 +30,14 @@ Designed for a single applicant (or a small group sharing one machine), not as a
 
 ```
                        +----------------+
-  cron / launchd  ---> |  run-daily.sh  |
+  cron / launchd  ---> |  refresh.js    |
                        +----------------+
                                |
                +---------------+---------------+
                v                               v
       +-----------------+            +-----------------+
       |   scraper.js    |            |  per-profile    |
-      | (11 platforms)  |            |  run            |
+      | (11 platforms)  |            |  env            |
       +--------+--------+            +--------+--------+
                |                              |
                v                              v
@@ -121,7 +121,7 @@ Every 5 minutes, the dashboard IMAPs your Gmail, pattern-matches rejection email
 
 ### Multi-profile support
 
-Multiple applicants on one machine (a couple, say) run isolated pipelines by pointing `JOB_PROFILE_DIR` and `JOB_DB_PATH` at different directories. `run-daily.sh` loops through all profiles automatically.
+Multiple applicants on one machine (a couple, say) can run isolated pipelines by pointing `JOB_PROFILE_DIR` and `JOB_DB_PATH` at different directories. The refresh flow runs the active profile from the environment.
 
 ## Design decisions
 
@@ -196,7 +196,7 @@ npm run help -- --json     # machine-readable command reference
 
 ### Refresh pipeline (recommended)
 
-`scripts/refresh-if-dashboard.sh` runs the full pipeline — scrape → score → check descriptions → check closed jobs → market research → rejection email sync → slug validation — but only when the dashboard is already running on its port. Safe to fire frequently; it skips silently when you're not using the dashboard.
+`scripts/refresh-if-dashboard.sh` runs the full active-profile pipeline — discover companies → scrape → score → retry unscored → check descriptions → auto-ghost stale applications → check closed jobs → market research → rejection email sync → slug validation → context update — but only when the dashboard is already running on its port. Safe to fire frequently; it skips silently when you're not using the dashboard.
 
 Add to crontab (`crontab -e`):
 
@@ -206,12 +206,12 @@ Add to crontab (`crontab -e`):
 
 Output is appended to `logs/refresh/YYYYMMDD.log` (created automatically).
 
-### Daily scrape (optional, runs regardless of dashboard)
+### Daily refresh (optional, runs regardless of dashboard)
 
-If you want a guaranteed morning scrape even when the dashboard is closed:
+If you want a guaranteed morning refresh even when the dashboard is closed:
 
 ```
-7 8 * * *   cd /path/to/job-search && bash scripts/run-daily.sh >> /tmp/job-search.log 2>&1
+7 8 * * *   cd /path/to/job-search && npm run refresh >> /tmp/job-search.log 2>&1
 ```
 
 ### macOS: keep the dashboard alive across reboots
