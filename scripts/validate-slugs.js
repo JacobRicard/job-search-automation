@@ -32,7 +32,7 @@ const { fetchWorkableAccountJobs } = require('../lib/workable');
 
 const log = createLogger('slug-health', { logFile: logPaths.daily('slug-health') });
 
-const TIMEOUT_MS = 8000;
+const TIMEOUT_MS = 15000;
 const DELAY_MS   = 120;
 const MAX_ATTEMPTS = 3;
 const RETRY_BASE_MS = 750;
