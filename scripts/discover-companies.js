@@ -214,7 +214,7 @@ async function main() {
   });
   let raw;
   try {
-    raw = await callGemini(buildPrompt(allTracked, contextSnippet, discoveryConfig.candidateCount), 0, maxOutputTokens);
+    raw = await callGemini(buildPrompt(allTracked, contextSnippet, discoveryConfig.candidateCount), undefined, maxOutputTokens);
   } catch (err) {
     log.error('Gemini call failed', { error: err.message });
     process.exit(0);
