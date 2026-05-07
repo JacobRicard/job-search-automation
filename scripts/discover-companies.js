@@ -17,7 +17,7 @@ loadDashboardEnv(repoRoot);
 
 const { SEARCH_TERMS, GREENHOUSE_COMPANIES, ASHBY_COMPANIES, LEVER_COMPANIES } = require('../config/companies');
 const { callGemini }                   = require('../lib/gemini');
-const { parseGeminiJson }              = require('../lib/ats-resolver');
+const { parseGeminiJsonArray }              = require('../lib/ats-resolver');
 const { loadSuggested, saveSuggested, allSlugs } = require('../lib/suggested-companies');
 const createLogger                     = require('../lib/logger');
 const logPaths                         = require('../lib/log-paths');
@@ -157,7 +157,7 @@ async function main() {
     process.exit(0);
   }
 
-  const candidates = parseGeminiJson(raw).filter(
+  const candidates = parseGeminiJsonArray(raw).filter(
     (c) => c && typeof c === 'object' && c.slug && c.platform,
   );
   log.info('Gemini returned candidates', { count: candidates.length });
