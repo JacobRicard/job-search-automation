@@ -7,6 +7,7 @@ const { spawnSync } = require('child_process');
 const { loadDashboardEnv, loadEnvFile } = require('../lib/env');
 const { formatBuffer } = require('../lib/refresh-logger');
 const { formatLocalTime, formatLocalTimestamp } = require('../lib/time-format');
+const { createRunId } = require('../lib/auto-apply-receipts');
 
 function parseArgs(argv) {
   const flags = new Set(argv.filter((arg) => arg.startsWith('--')));
@@ -64,7 +65,9 @@ const IS_LOG = !process.stdout.isTTY;
 
 function runStep(repoRoot, label, args, { optional = false } = {}) {
   const start = Date.now();
-  console.log(`${formatLocalTime()}  [refresh]  ${label}...`);
+  const runId = process.env.RUN_ID || '';
+  const tag = runId ? `[refresh runId=${runId}]` : '[refresh]';
+  console.log(`${formatLocalTime()}  ${tag}  ${label}...`);
 
   const result = spawnSync(process.execPath, args, {
     cwd: repoRoot,
@@ -82,15 +85,15 @@ function runStep(repoRoot, label, args, { optional = false } = {}) {
   }
 
   if (result.status === 0) {
-    console.log(`${formatLocalTime()}  [refresh]  ${label} done (${elapsed(start)})`);
+    console.log(`${formatLocalTime()}  ${tag}  ${label} done (${elapsed(start)})`);
     return;
   }
   if (optional) {
-    console.warn(`${formatLocalTime()}  [refresh]  ${label} skipped — exit ${result.status || 1} (${elapsed(start)})`);
+    console.warn(`${formatLocalTime()}  ${tag}  ${label} skipped, exit ${result.status || 1} (${elapsed(start)})`);
     return;
   }
 
-  console.error(`${formatLocalTime()}  [refresh]  ${label} FAILED — exit ${result.status || 1} (${elapsed(start)})`);
+  console.error(`${formatLocalTime()}  ${tag}  ${label} FAILED, exit ${result.status || 1} (${elapsed(start)})`);
   process.exit(result.status || 1);
 }
 
@@ -129,8 +132,11 @@ function main() {
   const runStart = Date.now();
   const active = loadActiveProfileEnv(repoRoot);
 
+  const runId = process.env.RUN_ID || createRunId('refresh');
+  process.env.RUN_ID = runId;
+
   console.log(`\n${'─'.repeat(60)}`);
-  console.log(`${formatLocalTimestamp(new Date(), { milliseconds: false })}  [refresh]  RUN START`);
+  console.log(`${formatLocalTimestamp(new Date(), { milliseconds: false })}  [refresh runId=${runId}]  RUN START`);
   console.log(`  profile  ${active.profileDir}`);
   console.log(`  db       ${active.dbPath}`);
   console.log('─'.repeat(60));
@@ -163,8 +169,15 @@ function main() {
     runStep(repoRoot, 'Validating ATS slugs', ['scripts/validate-slugs.js', '--broken-only'], { optional: true });
   }
 
+  // Best-effort log retention sweep at end of every run.
+  spawnSync(process.execPath, ['scripts/prune-logs.js'], {
+    cwd: repoRoot,
+    stdio: IS_LOG ? ['ignore', 'pipe', 'pipe'] : 'inherit',
+    env: process.env,
+  });
+
   console.log('─'.repeat(60));
-  console.log(`${formatLocalTimestamp(new Date(), { milliseconds: false })}  [refresh]  RUN COMPLETE (${elapsed(runStart)})`);
+  console.log(`${formatLocalTimestamp(new Date(), { milliseconds: false })}  [refresh runId=${runId}]  RUN COMPLETE (${elapsed(runStart)})`);
   console.log('─'.repeat(60));
 }
 

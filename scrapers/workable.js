@@ -11,9 +11,9 @@ async function scrapeWorkable() {
   const jobs = [];
 
   for (const company of WORKABLE_COMPANIES) {
+    const slugLog = log.child({ slug: company });
     const result = await fetchWorkableAccountJobs(company);
-    log.info('Workable slug checked', {
-      slug: company,
+    slugLog.info('Workable slug checked', {
       result: result.result,
       count: result.count,
       attempts: result.attempts.map((attempt) => ({

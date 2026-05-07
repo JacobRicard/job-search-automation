@@ -45,13 +45,14 @@ function isRecent(dateVal) {
 const SCRAPER_TIMEOUT_MS = 5 * 60 * 1000; // 5 min hard cap per scraper
 
 function timed(label, fn) {
+  const platformLog = log.child({ label });
   const start = Date.now();
   const timeout = new Promise((_, reject) =>
     setTimeout(() => reject(new Error(`timeout after ${SCRAPER_TIMEOUT_MS / 1000}s`)), SCRAPER_TIMEOUT_MS)
   );
   return Promise.race([fn(), timeout]).then(
-    (v) => { log.info('Scraper done', { label, ms: Date.now() - start }); return v; },
-    (e) => { log.warn('Scraper timed out or failed', { label, ms: Date.now() - start, error: e.message }); return []; }
+    (v) => { platformLog.info('Scraper done', { ms: Date.now() - start }); return v; },
+    (e) => { platformLog.warn('Scraper timed out or failed', { ms: Date.now() - start, error: e.message }); return []; }
   );
 }
 
