@@ -44,7 +44,7 @@ The following commands are available in both Claude Code (`.claude/commands/`) a
 |---|---|
 | `/load-context` | Start of any job-search or career session. Reads `.context/` and the active profile. |
 | `/job-search` | Review pending listings, approve/reject, check stats, run the pipeline. |
-| `/interview-prep [email or JD]` | Generate phone screen prep notes from a job description or recruiter email. |
+| `/interview-prep [company, email, or JD]` | Full interview prep: tell me about yourself, behavioral stories, match points, tech areas to review, questions to ask. Works for phone screens and second rounds. |
 | `/app-questions [question text]` | Answer application form questions in the applicant's voice. |
 | `/save-context` | End of session. Persist anything learned back to `.context/`. |
 

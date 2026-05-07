@@ -1,75 +1,126 @@
 ---
-description: Generate phone screen prep notes from an email or job description. Finds the job in the DB, generates notes, saves them back. Usage: /interview-prep [paste email or job description]
+description: Full interview prep for a specific role. Accepts a pasted job description, recruiter email, or just a company name. Generates a tailored "tell me about yourself", behavioral story answers, quick-reference match points, technical areas to review, questions to ask, and comp framing. Usage: /interview-prep [company name, email, or pasted JD]
 allowed-tools: Bash, Read
 ---
 
-You are generating phone screen prep notes. Follow these steps exactly.
+You are generating full interview prep. This covers both quick reference and spoken-answer coaching in one pass. Follow these steps exactly.
 
 ## Step 1: Parse the input
 
-Read `$ARGUMENTS`. Extract the company name and job title (if present).
+Read `$ARGUMENTS`. It may be a pasted job description, a recruiter email, or just a company name. Extract the company name and job title if present.
 
 ## Step 2: Resolve profile
 
-Read `.env` to find `JOB_DB_PATH` and `JOB_PROFILE_DIR`. Defaults: `JOB_DB_PATH=profiles/example/jobs.db`, `JOB_PROFILE_DIR=profiles/example`.
+Read `.env` to find `JOB_DB_PATH` and `JOB_PROFILE_DIR`.
 
 ## Step 3: Find the job in the DB
 
 ```bash
 node -e "
 const db = require('better-sqlite3')(process.env.JOB_DB_PATH || 'profiles/example/jobs.db');
-const jobs = db.prepare(\"SELECT id, title, company, score, stage, interview_notes FROM jobs WHERE status != 'archived' ORDER BY score DESC\").all();
+const jobs = db.prepare(\"SELECT id, title, company, score, stage, status FROM jobs WHERE status NOT IN ('archived', 'rejected') ORDER BY score DESC\").all();
 console.log(JSON.stringify(jobs, null, 2));
 "
 ```
 
-Match the company name from the input to a job. If multiple matches, pick the highest score or most recent. Show which job you matched and confirm before proceeding.
+Match the company name from the input. If multiple matches, pick the highest score or most recent. Confirm which job was matched before proceeding.
 
-## Step 4: Get the full job record
+Get the full record:
 
 ```bash
 node -e "
 const db = require('better-sqlite3')(process.env.JOB_DB_PATH || 'profiles/example/jobs.db');
-const job = db.prepare(\"SELECT id, title, company, description, reasoning FROM jobs WHERE id=?\").get('MATCHED_ID');
+const job = db.prepare(\"SELECT id, title, company, description, reasoning, stage FROM jobs WHERE id=?\").get('MATCHED_ID');
 console.log(JSON.stringify(job, null, 2));
 "
 ```
 
-## Step 5: Read the resume
+## Step 4: Read context files
 
-Read `{JOB_PROFILE_DIR}/resume.md` (e.g. `profiles/example/resume.md`).
+Read all of these before generating any output:
 
-Also read `.context/people/applicant.md` for background on the applicant's preferences and deal breakers.
+- `{JOB_PROFILE_DIR}/resume.md` — specific numbers and company names to pull from
+- `{JOB_PROFILE_DIR}/career-detail.md` — honest account of what was actually built at each job
+- `.context/people/applicant.md` — background, working style, preferences
+- `.context/people/voice.md` — writing rules (critical — read this carefully)
 
-## Step 6: Generate prep notes
+## Step 5: Generate prep
 
-Using the job description, reasoning, and resume, generate reference notes in this exact format. Bullet points only, no prose, no scripts. Every bullet must contain a specific fact, number, or company name from the resume.
+Generate all six sections. Sections marked "spoken" must follow the voice rules exactly.
 
-### Background
-2-3 bullets. Most relevant experience and standout numbers that set up the call.
+---
+
+### Quick Reference
+
+2-3 bullets. Most relevant experience and standout numbers for this specific role. Fact-only, no prose.
 
 ### Match Points
-For each major requirement area in the job description, 1-2 bullets:
+
+For each major requirement area in the JD, 1-2 bullets:
 - **JD area**: Company: specific achievement with number
 
-### Questions to Ask
-5-6 specific questions based on what the JD implies or leaves out. Should show you read it carefully.
+---
 
-### Culture / Values
-Only if the company lists named values. Map 2-3 to resume stories with numbers. Skip entirely if no named values.
+### Tell Me About Yourself *(spoken)*
+
+3-4 paragraph spoken answer tailored to this company and role. Lead with the most relevant experience. Pull real numbers. End low-key.
+
+---
+
+### Behavioral Questions *(spoken)*
+
+Pick the 5 most likely behavioral questions based on the JD. For each:
+
+**"[Question]"**
+[Full spoken answer using a real story from career-detail.md. Specific company, situation, what the applicant did, outcome with number. 3-6 sentences, conversational.]
+
+Questions to consider (pick most relevant):
+- A time you handled an incident under pressure
+- A complex infrastructure project you owned end-to-end
+- A time you made a decision with incomplete information
+- A time you improved something nobody asked you to fix
+- A time you had to learn something fast and ship it
+- A time you disagreed with a decision and what you did
+- How you make engineers around you more effective
+- How you balance speed and reliability
+
+---
+
+### Technical Areas to Review
+
+3-5 topics from the JD to brush up on. For each: actual depth (strong/moderate/newer) and one concrete thing to know or practice. Skip anything clearly known cold.
+
+---
+
+### Questions to Ask
+
+6-8 questions grouped by theme. Each should show the JD was read carefully.
+
+Themes:
+- Technical reality (current state, biggest pain, what's broken)
+- Compliance/security ambitions (where are they actually vs. what the JD implies)
+- Team structure (who they'd work with, on-call setup)
+- Engineering culture (how decisions get made)
+- Success definition (what does good look like in 6 months)
+
+---
 
 ### Comp
-One bullet: listed range (or "not listed"), where the applicant lands, one-line reason.
 
-## Step 7: Save notes to DB
+Listed range (or "not listed"). Where the applicant lands and why. One sentence on how to handle it if asked this round.
 
-Write notes to `/tmp/interview_notes.txt`, then:
+---
+
+## Step 6: Save to DB
+
+Write the full output to `/tmp/interview_notes.txt`, then:
 
 ```bash
 python3 -c "
 import sqlite3, os
 notes = open('/tmp/interview_notes.txt').read()
-db = sqlite3.connect(os.environ.get('JOB_DB_PATH', 'profiles/example/jobs.db'))
+db_path = os.environ.get('JOB_DB_PATH', 'profiles/example/jobs.db')
+db = sqlite3.connect(db_path)
 db.execute(\"UPDATE jobs SET interview_notes=?, updated_at=datetime('now') WHERE id=?\", (notes, 'MATCHED_ID'))
 db.commit()
 print('saved')
@@ -77,6 +128,6 @@ print('saved')
 rm /tmp/interview_notes.txt
 ```
 
-## Step 8: Confirm
+## Step 7: Confirm
 
-Tell the user: job matched, notes saved, "View notes" button will appear on the dashboard. Show the full notes inline too.
+Tell the user: job matched, notes saved, visible via "View notes" on the dashboard. Show the full output inline. Offer to drill into any section or run a mock Q&A on a specific question.

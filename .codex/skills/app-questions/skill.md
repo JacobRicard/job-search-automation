@@ -1,5 +1,5 @@
 ---
-description: Answer job application questions in the applicant's voice. Usage: /app-questions [paste the question or form fields]
+description: Answer job application questions in the applicant's voice. Usage: /app-questions [paste the question or form fields, OR an Ashby job URL or job ID]
 allowed-tools: Read, Bash
 ---
 
@@ -15,9 +15,18 @@ Read these files in full before drafting any answer:
 - `{JOB_PROFILE_DIR}/context.md` — full career context, preferences, deal breakers
 - `{JOB_PROFILE_DIR}/resume.md` — experience to draw specific facts from
 
-## Step 2: Parse questions
+## Step 2: Detect input type and parse questions
 
-Read `$ARGUMENTS`. Identify each distinct question or form field.
+Look at `$ARGUMENTS`:
+
+**If it starts with `ashby-` (job ID) or contains `jobs.ashbyhq.com` (Ashby URL):**
+- Job ID: `node scripts/apply-extract.js ashby-<id>`
+- URL: `node scripts/apply-extract.js --url=<url>`
+- Parse the JSON from stdout. Use `customFields` as the question list.
+- Each field has: `label`, `type` (text/textarea/select), `required`, `options[]`
+- For `select` fields the answer MUST exactly match one of the listed `options`.
+
+**Otherwise:** treat `$ARGUMENTS` as pasted question text and identify each distinct question or form field.
 
 ## Step 3: Draft answers
 

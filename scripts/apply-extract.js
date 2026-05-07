@@ -135,17 +135,38 @@ async function extractFromDom(page, job) {
 }
 
 async function main() {
-  const jobId = process.argv[2];
-  if (!jobId) {
+  const arg = process.argv[2];
+  if (!arg) {
     console.error('Usage: node scripts/apply-extract.js <job-id>');
+    console.error('       node scripts/apply-extract.js --url=https://jobs.ashbyhq.com/company/uuid');
     process.exit(1);
   }
 
   const db = new Database(dbPath);
-  const job = db.prepare('SELECT * FROM jobs WHERE id = ?').get(jobId);
-  if (!job) {
-    console.error(`Job not found: ${jobId}`);
-    process.exit(1);
+  let job;
+
+  const urlArg = arg.startsWith('--url=') ? arg.slice('--url='.length) : null;
+  if (urlArg) {
+    // Try DB lookup first
+    const ashbyMatch = urlArg.match(/jobs\.ashbyhq\.com\/([^/?#]+)\/([0-9a-f-]{36})/i);
+    if (!ashbyMatch) {
+      console.error('--url only supports Ashby URLs (jobs.ashbyhq.com/<company>/<uuid>)');
+      process.exit(1);
+    }
+    const [, company, uuid] = ashbyMatch;
+    job = db.prepare('SELECT * FROM jobs WHERE url LIKE ?').get(`%${uuid}%`);
+    if (!job) {
+      // Synthetic job object so DOM extraction can still run
+      job = { id: `ashby-${uuid}`, company, title: '', url: urlArg, platform: 'ashby' };
+      console.error(`Job not in DB — running DOM extraction on: ${urlArg}`);
+    }
+  } else {
+    const jobId = arg;
+    job = db.prepare('SELECT * FROM jobs WHERE id = ?').get(jobId);
+    if (!job) {
+      console.error(`Job not found: ${jobId}`);
+      process.exit(1);
+    }
   }
 
   console.error(`Extracting questions for: ${job.company} — ${job.title}`);
@@ -155,7 +176,7 @@ async function main() {
   const lowerUrl = String(job.url || '').toLowerCase();
   const platform = lowerPlatform.includes('greenhouse') || lowerUrl.includes('greenhouse')
     ? 'greenhouse'
-    : jobId.split('-')[0].toLowerCase();
+    : job.id.split('-')[0].toLowerCase();
   let customFields = [];
   let pageIssue = null;
   let shouldFallbackToDom = true;
@@ -212,6 +233,14 @@ async function main() {
       const page = await newPage(browser);
       console.error(`Navigating to: ${applyUrl}`);
       await page.goto(applyUrl, { waitUntil: 'networkidle2', timeout: 30000 });
+
+      // Ashby renders client-side; wait for form inputs to mount before inspecting
+      if (platform === 'ashby') {
+        try {
+          await page.waitForSelector('input, textarea, label', { timeout: 10000 });
+        } catch (_) { /* continue anyway, snapshot will catch empty state */ }
+        await new Promise(r => setTimeout(r, 2000));
+      }
 
       const screenshotFile = await saveScreenshot(page, job.company, 'extract');
       console.error(`Screenshot saved: ${screenshotFile}`);
