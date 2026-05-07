@@ -43,6 +43,9 @@ for profile_dir in profiles/*/; do
     echo "[run-daily] Checking description quality for $profile..."
     node scripts/check-descriptions.js || true
 
+    echo "[run-daily] Auto-ghosting stale applied jobs for $profile..."
+    node scripts/auto-ghost.js || true
+
     echo "[run-daily] Checking for closed jobs for $profile..."
     node scripts/check-closed.js
 
