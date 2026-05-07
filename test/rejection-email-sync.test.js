@@ -563,6 +563,85 @@ describe('rejection email sync', () => {
     assert.equal(lastUid.value, '99');
   });
 
+  it('rescans a Trash UID overlap when the checkpoint is ahead of a matching rejection', async () => {
+    const db = createDb();
+    insertJob(db, {
+      id: 'greenhouse-7336592',
+      company: 'reddit',
+      title: 'Staff Systems Engineer, AI Enablement and Productivity Engineering',
+      url: 'https://job-boards.greenhouse.io/reddit/jobs/7336592',
+      status: 'closed',
+      stage: 'closed',
+      applied_at: '2026-03-16T22:58:22.000Z',
+    });
+    insertJob(db, {
+      id: 'greenhouse-7731772',
+      company: 'reddit',
+      title: 'Senior Machine Learning Systems Engineer',
+      url: 'https://job-boards.greenhouse.io/reddit/jobs/7731772',
+      status: 'applied',
+      stage: 'applied',
+      applied_at: '2026-04-14T00:44:25.358Z',
+    });
+    db.prepare("INSERT INTO metadata (key, value) VALUES ('rejection_email_trash_last_uid', '570')").run();
+    db.prepare("INSERT INTO metadata (key, value) VALUES ('rejection_email_trash_uid_validity', '777')").run();
+
+    const trashMessage = makeMessage({
+      uid: 468,
+      subject: 'Update from Reddit',
+      fromAddress: 'no-reply@greenhouse.io',
+      receivedAt: '2026-05-06T16:51:02.000Z',
+      raw: `
+        Thank you for your interest in the Staff Systems Engineer, AI Enablement and
+        Productivity Engineering role at Reddit.
+        Unfortunately, we are unable to move forward with your application.
+      `,
+    });
+    const calls = [];
+    const fetchMessages = async ({ mailbox, lastUid, uidValidity, uidOverlap }) => {
+      calls.push({ mailbox, lastUid, uidValidity, uidOverlap });
+      if (mailbox !== '[Gmail]/Trash') {
+        return { uidValidity: '777', lastUid, messages: [] };
+      }
+
+      const floor = Number(lastUid) - Number(uidOverlap || 0);
+      return {
+        uidValidity: '777',
+        lastUid,
+        messages: trashMessage.uid > floor ? [trashMessage] : [],
+      };
+    };
+
+    const summary = await syncRejectionEmails(db, { fetchMessages });
+    const job = db.prepare(`
+      SELECT status, stage, rejected_from_stage, rejected_at
+      FROM jobs
+      WHERE id = 'greenhouse-7336592'
+    `).get();
+    const emailLog = db.prepare(`
+      SELECT mailbox, uid, matched_job_id, match_status, reason
+      FROM rejection_email_log
+      WHERE uid = 468
+    `).get();
+    const trashCall = calls.find((call) => call.mailbox === '[Gmail]/Trash');
+
+    assert.equal(trashCall.uidOverlap, 200);
+    assert.equal(summary.applied, 1);
+    assert.deepEqual(job, {
+      status: 'rejected',
+      stage: 'rejected',
+      rejected_from_stage: 'closed',
+      rejected_at: '2026-05-06T16:51:02.000Z',
+    });
+    assert.deepEqual(emailLog, {
+      mailbox: '[Gmail]/Trash',
+      uid: 468,
+      matched_job_id: 'greenhouse-7336592',
+      match_status: 'applied',
+      reason: 'company_title_match',
+    });
+  });
+
   it('prefers active jobs before falling back to already-rejected jobs', () => {
     const db = createDb();
     insertJob(db, {
