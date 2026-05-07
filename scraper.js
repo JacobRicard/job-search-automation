@@ -123,4 +123,4 @@ if (require.main === module) {
     });
 }
 
-module.exports = { scrapeAll };
+module.exports = { scrapeAll, isRecent };

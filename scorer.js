@@ -77,7 +77,10 @@ SCORE: <integer 1-10>
 REASONING: <2-4 sentences explaining the score>`;
 
   const text = await callGemini(prompt);
+  return parseScoreResponse(text);
+}
 
+function parseScoreResponse(text) {
   const scoreMatch = text.match(/^SCORE:\s*(\d+)/m);
   const reasoningMatch = text.match(/^REASONING:\s*(.+)/ms);
 
@@ -159,4 +162,4 @@ if (require.main === module) {
   });
 }
 
-module.exports = { scoreJob, scoreRejectionLikelihood, callGemini };
+module.exports = { scoreJob, scoreRejectionLikelihood, parseScoreResponse, callGemini };
