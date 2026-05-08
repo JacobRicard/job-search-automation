@@ -117,4 +117,81 @@ describe('application prep answer guidance', () => {
     assert.equal(unresolved.length, 1);
     assert.equal(unresolved[0].name, 'combo_auth');
   });
+
+  it('treats unanswered optional fields as intentionally blank', () => {
+    const { splitResolvedFields } = require('../lib/application-prep');
+
+    const { resolved, unresolved } = splitResolvedFields([{
+      label: 'What is your preferred name?',
+      name: 'preferred_name',
+      options: [],
+      type: 'text',
+      required: false,
+    }], {});
+
+    assert.deepEqual(resolved, { preferred_name: '' });
+    assert.deepEqual(unresolved, []);
+  });
+
+  it('resolves common Lever administrative fields without manual review', () => {
+    const previousCompany = process.env.APPLICANT_CURRENT_COMPANY;
+    const previousMailingAddress = process.env.APPLICANT_MAILING_ADDRESS;
+
+    try {
+      process.env.APPLICANT_CURRENT_COMPANY = 'EliseAI';
+      process.env.APPLICANT_MAILING_ADDRESS = '2130 8th Ave W\nApt 3\nSeattle, WA 98119';
+      delete require.cache[require.resolve('../config/applicant')];
+      delete require.cache[require.resolve('../lib/application-prep')];
+      const { heuristicAnswer } = require('../lib/application-prep');
+
+      assert.equal(heuristicAnswer({
+        label: 'Current company ✱',
+        options: [],
+        required: true,
+        type: 'text',
+      }, {}), 'EliseAI');
+
+      assert.equal(heuristicAnswer({
+        label: 'Twitter URL',
+        options: [],
+        required: false,
+        type: 'text',
+      }, {}), '');
+
+      assert.equal(heuristicAnswer({
+        label: 'Please confirm you have reviewed and are comfortable with the salary range listed for the position you’ve applied for.✱',
+        options: ['Yes', 'No'],
+        required: true,
+        type: 'select',
+      }, {}), 'Yes');
+
+      assert.equal(heuristicAnswer({
+        label: 'Are you subject to any post-employment restrictions, such as a non-compete or non-solicitation?✱',
+        options: ['Yes', 'No'],
+        required: true,
+        type: 'select',
+      }, {}), 'No');
+
+      assert.equal(heuristicAnswer({
+        label: 'To complete your candidate file, could you share your current mailing address?',
+        options: [],
+        required: true,
+        type: 'textarea',
+      }, {}), '2130 8th Ave W\nApt 3\nSeattle, WA 98119');
+
+      assert.equal(heuristicAnswer({
+        label: 'I agree to provide original, real-time responses during my interview without the use of AI-generated scripts or automated teleprompters.',
+        options: ['I agree', 'I do not agree'],
+        required: true,
+        type: 'select',
+      }, {}), 'I agree');
+    } finally {
+      if (previousCompany == null) delete process.env.APPLICANT_CURRENT_COMPANY;
+      else process.env.APPLICANT_CURRENT_COMPANY = previousCompany;
+      if (previousMailingAddress == null) delete process.env.APPLICANT_MAILING_ADDRESS;
+      else process.env.APPLICANT_MAILING_ADDRESS = previousMailingAddress;
+      delete require.cache[require.resolve('../config/applicant')];
+      delete require.cache[require.resolve('../lib/application-prep')];
+    }
+  });
 });

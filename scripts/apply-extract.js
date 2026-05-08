@@ -45,6 +45,7 @@ function isStandardField(name, label) {
   // Custom Greenhouse question IDs (question_XXXXXXXXX) are never standard,
   // even if their label says "LinkedIn" or "Website" — they need explicit answers.
   if (/^question_\d+$/i.test(name)) return false;
+  if (/how did you hear/i.test(label)) return false;
   const combined = `${name} ${label}`.toLowerCase();
   if (STANDARD_NAME_PATTERNS.some(p => p.test(name))) return true;
   if (/resume|cv|cover letter|linkedin|github|portfolio|website/i.test(combined)) return true;
@@ -89,47 +90,207 @@ function buildGreenhouseApplyUrl(job) {
   return `https://job-boards.greenhouse.io/${boardToken}/jobs/${jobId}`;
 }
 
+function applicationFieldExtractor() {
+  function normalize(text) {
+    return String(text || '').toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim();
+  }
+
+  function cleanText(text) {
+    return String(text || '').trim().replace(/\s+/g, ' ');
+  }
+
+  function isVisible(node) {
+    if (!node) return false;
+    const style = window.getComputedStyle(node);
+    if (style.display === 'none' || style.visibility === 'hidden') return false;
+    const rect = node.getBoundingClientRect();
+    return rect.width > 0 && rect.height > 0;
+  }
+
+  function optionTexts(input) {
+    if (input.tagName === 'SELECT') {
+      return Array.from(input.options || [])
+        .map((option) => cleanText(option.text || option.textContent))
+        .filter(Boolean);
+    }
+
+    const name = input.name || '';
+    const selector = input.type === 'radio'
+      ? `input[type="radio"][name="${CSS.escape(name)}"]`
+      : `input[type="checkbox"][name="${CSS.escape(name)}"]`;
+    const choices = name
+      ? Array.from(document.querySelectorAll(selector))
+      : [input];
+
+    return choices
+      .map((choice) => {
+        const wrappingLabel = choice.closest('label');
+        if (wrappingLabel) return cleanText(wrappingLabel.innerText);
+        if (choice.id) {
+          const explicit = document.querySelector(`label[for="${CSS.escape(choice.id)}"]`);
+          if (explicit) return cleanText(explicit.innerText);
+        }
+        return cleanText(choice.value);
+      })
+      .filter(Boolean);
+  }
+
+  function buildCardFieldMetadata() {
+    const map = new Map();
+    const templates = Array.from(document.querySelectorAll('input[type="hidden"][name^="cards["][name$="[baseTemplate]"]'));
+
+    for (const template of templates) {
+      const match = String(template.name || '').match(/^cards\[([^\]]+)\]\[baseTemplate\]$/);
+      if (!match) continue;
+      let parsed;
+      try {
+        parsed = JSON.parse(template.value || '');
+      } catch (_) {
+        continue;
+      }
+      const fields = Array.isArray(parsed.fields) ? parsed.fields : [];
+      fields.forEach((field, index) => {
+        const name = `cards[${match[1]}][field${index}]`;
+        map.set(name, {
+          labelText: cleanText(field.text || ''),
+          type: String(field.type || ''),
+          required: Boolean(field.required),
+          options: Array.isArray(field.options)
+            ? field.options.map((option) => cleanText(option.text)).filter(Boolean)
+            : [],
+        });
+      });
+    }
+
+    return map;
+  }
+
+  function nearestField(node) {
+    return node.closest(
+      '.application-field, .application-question, .application-question-card, .application-eeo, .postings-application-question, fieldset, [class*="field"], [class*="question"]'
+    );
+  }
+
+  function labelFromGroup(group, input) {
+    if (input.id) {
+      const explicit = document.querySelector(`label[for="${CSS.escape(input.id)}"]`);
+      if (explicit) {
+        const explicitText = cleanText(explicit.innerText);
+        if (explicitText) return explicitText;
+      }
+    }
+
+    const wrappingLabel = input.closest('label');
+    if (wrappingLabel && !['radio', 'checkbox'].includes(String(input.type || '').toLowerCase())) {
+      const clone = wrappingLabel.cloneNode(true);
+      for (const node of Array.from(clone.querySelectorAll('input, textarea, select, option'))) {
+        node.remove();
+      }
+      const wrappingText = cleanText(clone.innerText);
+      if (wrappingText) return wrappingText;
+    }
+
+    const scoped = group || nearestField(input) || input.parentElement;
+    const legend = scoped?.querySelector('legend');
+    if (legend?.innerText) return cleanText(legend.innerText);
+
+    const label = scoped?.querySelector('label');
+    if (label?.innerText) {
+      const clone = label.cloneNode(true);
+      for (const node of Array.from(clone.querySelectorAll('input, textarea, select, option'))) {
+        node.remove();
+      }
+      const labelText = cleanText(clone.innerText);
+      if (labelText) return labelText;
+    }
+
+    const heading = scoped?.querySelector('h1, h2, h3, h4, [class*="label"], [class*="question"]');
+    if (heading?.innerText) {
+      const text = cleanText(heading.innerText);
+      if (text) return text;
+    }
+
+    return cleanText(input.getAttribute('aria-label') || input.getAttribute('placeholder') || input.name || input.id);
+  }
+
+  function fieldType(input, metadata) {
+    if (metadata?.type) {
+      const lower = metadata.type.toLowerCase();
+      if (lower === 'multiple-select') return 'multi_select';
+      if (lower === 'textarea') return 'textarea';
+      if (lower === 'text') return 'text';
+      if (lower === 'file-upload') return 'file';
+      return lower;
+    }
+
+    const tag = input.tagName;
+    const type = String(input.type || '').toLowerCase();
+    if (tag === 'TEXTAREA') return 'textarea';
+    if (tag === 'SELECT') return 'select';
+    if (type === 'radio') return 'select';
+    if (type === 'checkbox') return 'multi_select';
+    return type || 'text';
+  }
+
+  function isRequired(input, label, group, metadata) {
+    if (metadata) return metadata.required;
+    if (input.required) return true;
+    if ((input.getAttribute('aria-required') || '').toLowerCase() === 'true') return true;
+    const text = cleanText(`${label} ${group?.innerText || ''}`);
+    return /[✱*]|\brequired\b/i.test(text);
+  }
+
+  function specialLabel(input) {
+    const name = String(input.name || '').toLowerCase();
+    if (name === 'eeo[gender]') return 'Gender';
+    if (name === 'eeo[race]') return 'Race';
+    if (name === 'eeo[veteran]') return 'Veteran status';
+    if (name === 'eeo[disability]') return 'Disability status';
+    return '';
+  }
+
+  function addField(results, seen, input, cardMetadata) {
+    if (!isVisible(input)) return;
+    const type = String(input.type || '').toLowerCase();
+    if (['hidden', 'file', 'submit', 'button', 'image', 'reset'].includes(type)) return;
+    if ((type === 'radio' || type === 'checkbox') && !input.name) return;
+
+    const group = nearestField(input);
+    const name = input.name || input.id || '';
+    const dedupeKey = type === 'radio' || type === 'checkbox' ? `${type}:${name}` : `${name}:${input.id}`;
+    if (seen.has(dedupeKey)) return;
+    seen.add(dedupeKey);
+
+    const labelText = labelFromGroup(group, input);
+    const metadata = cardMetadata.get(name);
+    const finalLabel = metadata?.labelText || specialLabel(input) || labelText;
+    if (!finalLabel || !name) return;
+
+    results.push({
+      labelText: finalLabel,
+      name,
+      type: fieldType(input, metadata),
+      required: isRequired(input, finalLabel, group, metadata),
+      options: metadata?.options?.length
+        ? metadata.options
+        : (['radio', 'checkbox'].includes(type) || input.tagName === 'SELECT' ? optionTexts(input) : []),
+    });
+  }
+
+  const results = [];
+  const seen = new Set();
+  const cardMetadata = buildCardFieldMetadata();
+  const fields = Array.from(document.querySelectorAll('input, textarea, select'));
+  for (const field of fields) addField(results, seen, field, cardMetadata);
+
+  return results.filter((field) => normalize(field.labelText) !== 'select');
+}
+
 async function extractFromDom(page, job) {
   await new Promise(r => setTimeout(r, 2000));
 
   // Extract all labeled form fields from the DOM
-  const fields = await page.evaluate(() => {
-    const results = [];
-    const labels = document.querySelectorAll('label');
-
-    for (const label of labels) {
-      const forId = label.htmlFor;
-      let input = null;
-
-      if (forId) {
-        input = document.getElementById(forId);
-      }
-      if (!input) {
-        input = label.querySelector('input, textarea, select');
-      }
-      if (!input) {
-        const next = label.nextElementSibling;
-        if (next && ['INPUT', 'TEXTAREA', 'SELECT'].includes(next.tagName)) {
-          input = next;
-        }
-      }
-      if (!input) continue;
-
-      const labelText = label.innerText.trim().replace(/\s+/g, ' ');
-      const name = input.name || input.id || '';
-      const type = input.tagName === 'TEXTAREA' ? 'textarea'
-        : input.tagName === 'SELECT' ? 'select'
-        : (input.type || 'text');
-      const required = input.required || label.querySelector('[aria-required="true"]') !== null;
-
-      const options = type === 'select'
-        ? Array.from(input.options).map(o => o.text).filter(t => t && t !== '--')
-        : [];
-
-      results.push({ labelText, name, type, required, options });
-    }
-    return results;
-  });
+  const fields = await page.evaluate(applicationFieldExtractor);
 
   return fields;
 }
@@ -278,4 +439,12 @@ async function main() {
   db.close();
 }
 
-main().catch(e => { console.error(e); process.exit(1); });
+if (require.main === module) {
+  main().catch(e => { console.error(e); process.exit(1); });
+}
+
+module.exports = {
+  applicationFieldExtractor,
+  extractFromDom,
+  isStandardField,
+};
