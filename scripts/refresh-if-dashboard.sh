@@ -28,7 +28,7 @@ fi
 
 echo "$(NOW) [refresh-if-dashboard] dashboard detected on port $PORT — starting refresh" >> "$LOG"
 cd "$REPO"
-node scripts/refresh.js "$@" >> "$LOG" 2>&1
+npm run refresh -- "$@" >> "$LOG" 2>&1
 EXIT=$?
 echo "$(NOW) [refresh-if-dashboard] refresh exited ($EXIT)" >> "$LOG"
 exit $EXIT
