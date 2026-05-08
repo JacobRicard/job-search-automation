@@ -53,6 +53,7 @@ describe('refresh log formatting', () => {
 
     assert.match(script, /LOG_DIR="\$REPO\/logs\/refresh"/);
     assert.match(script, /LOG="\$LOG_DIR\/\$\(date \+%Y%m%d\)\.log"/);
+    assert.match(script, /npm run refresh -- "\$@"/);
     assert.doesNotMatch(script, /logs\/refresh\.log/);
   });
 });
