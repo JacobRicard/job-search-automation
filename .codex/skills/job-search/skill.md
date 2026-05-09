@@ -1,65 +1,108 @@
 ---
-description: Local MacBook job-search control surface. Use when asked to refresh jobs, review the queue, check progress, or open the dashboard. This skill is the primary daily entrypoint.
+name: job-search
+description: >
+  Review pending job listings, approve/reject them, check stats, run the pipeline.
+  Use when asked to "review jobs", "show job matches", "approve/reject jobs",
+  "find me jobs", "run job search", "look for DevOps jobs", or similar.
+  The scraper runs automatically at 8:07am daily. This skill is for reviewing
+  and managing those results interactively.
+version: 2.0.0
 allowed-tools: Bash, Read
 ---
 
-## Operating model
+Job search DB: `~/job-search/profiles/jake/jobs.db`. Dashboard: http://localhost:3131
 
-Assume one active local profile, resolved from `.env`:
+## Step 1: Stats
 
-- `JOB_PROFILE_DIR`
-- `JOB_DB_PATH`
-- `DASHBOARD_PORT`
-
-Do not rely on SSH, cron, or an always-on dashboard as the normal path.
-
-## Daily commands
-
-- Refresh jobs locally: `npm run refresh`
-- Open the dashboard when needed: `npm start`
-- Review the queue from SQLite with local commands
-- Hand off actual submissions to the reviewed apply flow: `node scripts/apply-extract.js <job-id>` then `node scripts/apply-submit.js <job-id> /tmp/apply-answers-<job-id>.json`
-
-## Review flow
-
-1. Read `.env` and resolve the active profile.
-2. Show local stats from the active SQLite DB.
-3. Load the highest-signal pending jobs first.
-4. If the user asks to refresh, run `npm run refresh`.
-5. If the user wants the web UI, use `npm start` and point them to `http://localhost:${DASHBOARD_PORT:-3131}`.
-6. If the user wants to submit, switch to the apply skill or run the local apply CLI.
-
-## Useful local queries
-
-Stats:
-
-```bash
-node -e "
-const db = require('better-sqlite3')(process.env.JOB_DB_PATH || 'profiles/example/jobs.db');
+!`cd ~/job-search && node -e "
+const db = require('better-sqlite3')('profiles/jake/jobs.db');
 console.log(JSON.stringify({
-  total: db.prepare('SELECT COUNT(*) c FROM jobs').get().c,
-  pending: db.prepare(\"SELECT COUNT(*) c FROM jobs WHERE status='pending'\").get().c,
+  total:     db.prepare('SELECT COUNT(*) c FROM jobs').get().c,
+  pending:   db.prepare(\"SELECT COUNT(*) c FROM jobs WHERE status='pending'\").get().c,
   highScore: db.prepare(\"SELECT COUNT(*) c FROM jobs WHERE status='pending' AND score >= 7\").get().c,
-  applied: db.prepare(\"SELECT COUNT(*) c FROM jobs WHERE status='applied'\").get().c,
+  applied:   db.prepare(\"SELECT COUNT(*) c FROM jobs WHERE status='applied'\").get().c,
   responded: db.prepare(\"SELECT COUNT(*) c FROM jobs WHERE status='responded'\").get().c,
-  rejected: db.prepare(\"SELECT COUNT(*) c FROM jobs WHERE stage='rejected'\").get().c,
-  archived: db.prepare(\"SELECT COUNT(*) c FROM jobs WHERE status='archived' AND (stage IS NULL OR stage != 'rejected')\").get().c
+  rejected:  db.prepare(\"SELECT COUNT(*) c FROM jobs WHERE stage='rejected'\").get().c,
+  archived:  db.prepare(\"SELECT COUNT(*) c FROM jobs WHERE status='archived' AND (stage IS NULL OR stage != 'rejected')\").get().c,
+  lastRun:   db.prepare(\"SELECT MAX(created_at) c FROM jobs\").get().c,
 }, null, 2));
-"
-```
+"`
 
-High-scoring pending jobs:
+Show stats clearly. Note how many high-scoring (7+) pending jobs await review.
 
-```bash
-node -e "
-const db = require('better-sqlite3')(process.env.JOB_DB_PATH || 'profiles/example/jobs.db');
+## Step 2: Load pending jobs
+
+!`cd ~/job-search && node -e "
+const db = require('better-sqlite3')('profiles/jake/jobs.db');
 const jobs = db.prepare(\"SELECT id, title, company, platform, location, url, score, reasoning FROM jobs WHERE status='pending' AND score >= 7 ORDER BY score DESC LIMIT 20\").all();
 console.log(JSON.stringify(jobs, null, 2));
-"
+"`
+
+## Step 3: Review one at a time
+
+Present each job and wait for a reply before moving on:
+
+```
+──────────────────────────────────────────
+[{score}/10] {title}
+{company} · {platform} · {location}
+{url}
+
+{reasoning}
+──────────────────────────────────────────
+approve / reject / skip / stop
 ```
 
-## Notes
+After each reply, update the DB immediately using the correct schema:
 
-- The dashboard is optional. SQLite is the source of truth either way.
-- Raw scripts remain available, but `npm run refresh` is the standard local refresh action.
-- Do not present scheduled wrappers as the default workflow.
+- `approve` / `yes` / `y` → set `status='applied'`:
+```bash
+cd ~/job-search && node -e "require('better-sqlite3')('profiles/jake/jobs.db').prepare(\"UPDATE jobs SET status='applied', applied_at=COALESCE(applied_at, datetime('now')), updated_at=datetime('now') WHERE id=?\").run('JOB_ID');"
+```
+
+- `reject` / `no` / `n` → set `status='archived'`, `stage='rejected'`:
+```bash
+cd ~/job-search && node -e "require('better-sqlite3')('profiles/jake/jobs.db').prepare(\"UPDATE jobs SET status='archived', stage='rejected', rejected_at=datetime('now'), updated_at=datetime('now') WHERE id=?\").run('JOB_ID');"
+```
+
+- `archive` / `a` → set `status='archived'` (no stage, hidden from queue):
+```bash
+cd ~/job-search && node -e "require('better-sqlite3')('profiles/jake/jobs.db').prepare(\"UPDATE jobs SET status='archived', updated_at=datetime('now') WHERE id=?\").run('JOB_ID');"
+```
+- `skip` / `s` → stay `pending`, move on
+- `stop` → end loop, go to Step 4
+
+Batch commands like "reject all below 6" or "approve all 9s" are fine. Handle with a single UPDATE.
+
+## Step 4: Summary
+
+Show: approved / rejected this session, pending remaining, dashboard link http://localhost:3131
+
+---
+
+## Other things the user might ask
+
+**"run the pipeline now"**, run in background:
+```bash
+/bin/zsh ~/job-search/run-daily.sh >> /tmp/job-search.log 2>&1 &
+echo "Running. Check /tmp/job-search.log for progress."
+```
+
+**"what have I applied to":**
+```bash
+cd ~/job-search && node -e "const db=require('better-sqlite3')('profiles/jake/jobs.db');console.log(JSON.stringify(db.prepare(\"SELECT title,company,url,status,updated_at FROM jobs WHERE status IN ('applied','responded') ORDER BY updated_at DESC\").all(),null,2));"
+```
+
+**"mark Company as responded":** find job by company, update status to `responded`.
+
+**"show archived" / "what did I archive":**
+```bash
+cd ~/job-search && node -e "const db=require('better-sqlite3')('profiles/jake/jobs.db');console.log(JSON.stringify(db.prepare(\"SELECT title,company,url,score,updated_at FROM jobs WHERE status='archived' ORDER BY updated_at DESC\").all(),null,2));"
+```
+
+**"unarchive Company":** find job by company, update status back to `pending`.
+
+**"reject all below 6":**
+```bash
+cd ~/job-search && node -e "const r=require('better-sqlite3')('profiles/jake/jobs.db').prepare(\"UPDATE jobs SET status='archived', stage='rejected', rejected_at=datetime('now'), updated_at=datetime('now') WHERE status='pending' AND score < 6\").run();console.log('rejected '+r.changes);"
+```

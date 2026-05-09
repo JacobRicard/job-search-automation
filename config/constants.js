@@ -1,7 +1,12 @@
 'use strict';
 
+function parsePositiveInteger(value, fallback) {
+  const parsed = Number(value);
+  return Number.isInteger(parsed) && parsed > 0 ? parsed : fallback;
+}
+
 // Gemini API rate limiting — stay under 15 RPM free tier (~12/min at 5s gaps)
-const GEMINI_RATE_DELAY_MS = 5000;
+const GEMINI_RATE_DELAY_MS = parsePositiveInteger(process.env.GEMINI_RATE_DELAY_MS, 5000);
 const GEMINI_RETRY_BASE_DELAY_MS = 5000;
 const GEMINI_429_DELAY_MS = 30000;
 const GEMINI_MAX_RETRIES = 5;

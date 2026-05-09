@@ -26,6 +26,7 @@ const { GEMINI_DAILY_LIMIT } = require('./config/constants');
 const { classifyComplexity } = require('./lib/complexity');
 const { isPrimaryPlatform } = require('./lib/ats-resolver');
 const { normalizeScrapedJobs } = require('./scripts/resolve-ats-aliases');
+const { getHistoricalStageStats } = require('./lib/stage-stats');
 const logPaths = require('./lib/log-paths');
 const log = require('./lib/logger')('pipeline', { logFile: logPaths.daily('pipeline') });
 
@@ -232,15 +233,14 @@ async function run() {
   log.info('Daily summary', { summary });
 
   // Run stats snapshot — visible at a glance in kubectl logs
+  const historicalStages = getHistoricalStageStats(db);
   const stats = db.prepare(`
     SELECT
       COUNT(*)                                                        AS total,
       COUNT(CASE WHEN status = 'pending' THEN 1 END)                 AS pending_review,
       COUNT(CASE WHEN status = 'pending' AND score >= 7 THEN 1 END)  AS pending_high_score,
       COUNT(CASE WHEN applied_at IS NOT NULL THEN 1 END)             AS applied,
-      COUNT(CASE WHEN stage = 'phone_screen' THEN 1 END)             AS phone_screens,
-      COUNT(CASE WHEN stage = 'interview' THEN 1 END)                AS interviews,
-      COUNT(CASE WHEN status = 'rejected' THEN 1 END)                AS rejected,
+      COUNT(CASE WHEN stage = 'rejected' THEN 1 END)                 AS rejected,
       COUNT(CASE WHEN status = 'archived' THEN 1 END)                AS archived,
       COUNT(CASE WHEN date(created_at, 'localtime') = date('now', 'localtime') AND status != 'archived' THEN 1 END) AS new_today
     FROM jobs
@@ -250,8 +250,8 @@ async function run() {
     pending_review:     stats.pending_review,
     pending_high_score: `${stats.pending_high_score} (score 7+)`,
     applied:            stats.applied,
-    phone_screens:      stats.phone_screens,
-    interviews:         stats.interviews,
+    phone_screens:      historicalStages.phoneScreens,
+    interviews:         historicalStages.interviews,
     rejected:           stats.rejected,
     total_in_db:        stats.total,
   });
