@@ -48,6 +48,14 @@ describe('Gemini rate limit configuration', () => {
   });
 });
 
+describe('Gemini model configuration', () => {
+  it('uses the GA Flash Lite model identifier', () => {
+    const { MODEL } = require('../lib/gemini');
+
+    assert.equal(MODEL, 'gemini-3.1-flash-lite');
+  });
+});
+
 describe('Gemini shared request slot reservations', () => {
   it('spaces sequential reservations by at least the configured delay', () => {
     const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'gemini-rate-limit-'));

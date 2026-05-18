@@ -6,6 +6,7 @@ const assert = require('node:assert/strict');
 
 const { applyBaseSchema, applyMigrations } = require('../lib/db/schema');
 const { fetchAnalyticsData } = require('../lib/dashboard-routes');
+const { renderAnalytics } = require('../lib/html/analytics');
 const {
   getHistoricalStageStats,
   getHistoricalAdvancedCountsByScore,
@@ -31,7 +32,7 @@ function insertJob(db, job) {
     job.url || `https://example.com/${job.id}`,
     job.platform || 'Lever',
     job.status || 'applied',
-    job.applied_at || '2026-04-01T00:00:00Z',
+    Object.hasOwn(job, 'applied_at') ? job.applied_at : '2026-04-01T00:00:00Z',
     job.stage || null,
     job.rejected_from_stage || null,
     job.score ?? null
@@ -97,17 +98,27 @@ describe('historical stage stats', () => {
     insertJob(db, { id: 'interview-only', stage: 'rejected', rejected_from_stage: 'applied', score: 8 });
     insertJob(db, { id: 'current-onsite', stage: 'onsite', score: 9 });
     insertJob(db, { id: 'not-advanced', stage: 'applied', score: 9 });
+    insertJob(db, { id: 'never-applied-scored', status: 'pending', applied_at: null, score: 9 });
+    insertJob(db, { id: 'terminal-pending', status: 'pending', stage: 'rejected', score: 6 });
 
     insertStageEvent(db, 'interview-only', 'interview');
 
     const analytics = fetchAnalyticsData(db);
+    const scoreNine = analytics.scoreCalibration.find(row => row.score === 9);
 
     assert.equal(analytics.allTimeStats.phoneScreens, 1);
     assert.equal(analytics.allTimeStats.interviewing, 2);
+    assert.equal(analytics.allTimeStats.pending, 1);
     assert.equal(analytics.funnel.phone_screen, 1);
     assert.equal(analytics.funnel.interview, 2);
     assert.equal(analytics.scoreCalibration.find(row => row.score === 7).advanced, 1);
     assert.equal(analytics.scoreCalibration.find(row => row.score === 8).advanced, 1);
-    assert.equal(analytics.scoreCalibration.find(row => row.score === 9).advanced, 1);
+    assert.equal(scoreNine.total, 2);
+    assert.equal(scoreNine.active, 2);
+    assert.equal(scoreNine.advanced, 1);
+
+    const html = renderAnalytics(analytics);
+    assert.match(html, /<th>Active<\/th>/);
+    assert.match(html, /50%/);
   });
 });
