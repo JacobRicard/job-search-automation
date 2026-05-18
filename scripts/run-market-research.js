@@ -13,6 +13,7 @@ const path = require('path');
 const Database = require('better-sqlite3');
 const { callGemini } = require('../lib/gemini');
 const { loadCanonicalClusters, saveCanonicalClusters, buildClusterRule } = require('../lib/canonical-clusters');
+const { getLiveMarketResearchJobs } = require('../lib/market-jobs');
 const logPaths = require('../lib/log-paths');
 const log = require('../lib/logger')('market-research', { logFile: logPaths.daily('market-research') });
 
@@ -33,22 +34,22 @@ function loadCache() {
 
 async function main() {
   const cache = loadCache();
-  if (cache && cache.generatedAt && Date.now() - cache.generatedAt < CACHE_TTL_MS) {
-    const ageHours = ((Date.now() - cache.generatedAt) / 3600000).toFixed(1);
-    log.info('Cache fresh, skipping', { ageHours: Number(ageHours) });
-    return;
-  }
-
   const db = new Database(DB_PATH, { readonly: true });
 
-  const jobs = db.prepare(`
-    SELECT title, company, description, score, posted_at, location
-    FROM jobs
-    WHERE status != 'archived' AND description IS NOT NULL AND length(description) > 100
-    ORDER BY score DESC, created_at DESC
-  `).all();
+  const jobs = getLiveMarketResearchJobs(db);
 
   db.close();
+
+  if (
+    cache
+    && cache.generatedAt
+    && Date.now() - cache.generatedAt < CACHE_TTL_MS
+    && Number(cache.jobCount) === jobs.length
+  ) {
+    const ageHours = ((Date.now() - cache.generatedAt) / 3600000).toFixed(1);
+    log.info('Cache fresh, skipping', { ageHours: Number(ageHours), jobs: jobs.length });
+    return;
+  }
 
   if (jobs.length === 0) {
     log.info('No jobs with descriptions found, skipping');

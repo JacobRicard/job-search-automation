@@ -115,6 +115,33 @@ All answers generated for applications pass through a voice check (`lib/voice-ch
 
 Server-rendered HTML (no framework, no build step) on `localhost:3131`. Filter tabs, pipeline tracking (Applied → Phone Screen → Interview → Onsite → Offer / Rejected), market research analytics, company notes, and interview prep notes attached to each job.
 
+Dashboard views:
+
+- **All** — active jobs that are not archived, rejected, closed, or ghosted.
+- **Not Applied** — the main triage queue for jobs that still need a decision.
+- **Applied** — submitted applications that are still active.
+- **Interviewing** — phone screen, interview, onsite, and offer stages.
+- **Rejected / Closed / Ghosted / Archived** — terminal or hidden-state queues.
+- **Stats** — funnel, score calibration, recent events, rejection timing, and apply receipt summaries.
+- **Apply Receipts** — auto-apply or assisted-apply attempt log with status, platform, mode, failure class, score, age, screenshots, and resume artifacts.
+- **Event Log** — audit trail from stage, outreach, and archive changes.
+- **Market Research** — aggregate JD analysis against the active profile, including seniority, location, skill clusters, strategy score, and emerging high-score signals.
+
+Job card actions:
+
+- Change pipeline stage: pending, applied, phone screen, interview, onsite, offer, closed, rejected, or ghosted.
+- Inspect LLM reasoning, saved job description, salary/ATS/company badges, apply screenshots, and company-level tags.
+- Generate manual application prep, copy generated answers, run the bookmarklet payload, and generate or open a tailored resume.
+- Toggle outreach tracking and archive jobs without deleting their records.
+
+Search and filters:
+
+- The URL stores `filter`, `sort`, `level`, `q`, `minScore`, and `page`, so dashboard views are linkable.
+- Search matches title, company, location, description, reasoning, rejection reasoning, status, stage, apply complexity, and platform.
+- Sort by score or date; rejected jobs default to date sort.
+- The My Level filter applies seniority matching based on title and description.
+- Job-list views paginate at 25 jobs per page.
+
 ### Rejection email sync
 
 Every 5 minutes, the dashboard IMAPs your Gmail, pattern-matches rejection emails against known applied jobs, and flips their stage to `rejected` with the rejection reason parsed out.
@@ -191,6 +218,67 @@ npm run help               # command reference with use cases and flags
 npm run help -- apply      # filter commands by group, command, flag, or text
 npm run help -- --json     # machine-readable command reference
 ```
+
+## Dashboard route reference
+
+The dashboard is a single local Node HTTP process. It serves HTML, JSON, generated artifacts, health checks, and mutations from the same server.
+
+Read routes:
+
+| Route | Purpose |
+| --- | --- |
+| `GET /` | Main dashboard. Query params include `filter`, `sort`, `level`, `q`, `minScore`, and `page`. |
+| `GET /help` | In-dashboard system guide and route/feature documentation. |
+| `GET /resume` | Streams the active profile resume PDF. `variant=ai` or `variant=devops` streams configured variants. |
+| `GET /company-notes?company=<name>` | Reads normalized company tags and notes. |
+| `GET /job-description?id=<job-id>` | Returns title, company, URL, and saved full JD text. |
+| `GET /job-apply-images?id=<job-id>` | Reports whether pre-apply and post-apply screenshots exist. |
+| `GET /job-apply-image?id=<job-id>&phase=pre\|post` | Streams one apply screenshot. |
+| `GET /job-application-prep?id=<job-id>` | Renders generated manual application prep. |
+| `GET /job-application-data?id=<job-id>` | Returns the application prep JSON payload used by copy actions and bookmarklets. |
+| `GET /job-bookmarklet.js?id=<job-id>` | Returns a job-specific browser autofill script. |
+| `GET /tailored-resume?id=<job-id>&type=pdf\|html\|md` | Streams generated tailored resume artifacts. |
+| `GET /auto-apply-attempt?id=<attempt-id>` | Returns one apply receipt. |
+| `GET /auto-apply-artifact?attemptId=<attempt-id>&type=resume\|pre\|post` | Streams a receipt artifact. |
+| `GET /api/tracker?period=7d\|30d\|90d\|all` | Returns tracker rows for market and activity charts. |
+| `GET /api/insights` | Returns daily digest, activity counts, scraper health, and daily applied chart rows. |
+| `GET /healthz` | SQLite-backed health probe. |
+| `GET /metrics` | Prometheus text metrics. |
+| `GET /public/*` | Static dashboard CSS, JS, and bookmarklet assets. |
+
+Write routes:
+
+| Route | Purpose |
+| --- | --- |
+| `POST /pipeline` | Changes job stage/status and writes an event row. |
+| `POST /mark-outreach` | Toggles `reached_out_at` for a job. |
+| `POST /archive` | Archives a job without deleting it. |
+| `POST /company-notes` | Saves company tags and notes. |
+| `POST /job-application-prep` | Generates or refreshes application prep for a job. |
+| `POST /tailored-resume` | Generates a tailored resume for a job. |
+| `POST /market-research` | Regenerates market research cache and redirects back to the dashboard view. |
+| `POST /dismiss-slug-banner` | Dismisses the current broken-slug warning banner. |
+
+## Application workflow in the dashboard
+
+The active workflow keeps final submission under human control:
+
+1. Open a high-score job from **Not Applied** or **All**.
+2. Use **Manual Apply Prep** to generate questions, answers, voice checks, and a job-specific JSON payload.
+3. Use **Tailor Resume** when the application should get a job-specific resume; generated artifacts are stored under the active profile.
+4. Open the job posting and use the bookmarklet or copy modal to fill supported application fields.
+5. Review in the browser, submit manually, then move the dashboard stage to **Applied**.
+
+Apply receipts and screenshots are kept for diagnostics and auditability. They are especially useful for supported ATS flows such as Greenhouse, Lever, and Ashby.
+
+## Operations and diagnostics
+
+- `GET /healthz` returns a simple JSON health check backed by SQLite.
+- `GET /metrics` exposes Prometheus-format counters, durations, and gauges for HTTP traffic and job state.
+- The dashboard starts an in-process rejection email poller when Gmail credentials are configured.
+- Slug health warnings come from `slug-health.json`; dismissing a banner records the current slug-health timestamp.
+- JD quality context comes from `jd-health.json`.
+- The Help page at `/help` is the most complete local operator guide and includes runtime paths for the active profile.
 
 ## Scheduling
 

@@ -71,6 +71,45 @@ function insertTailoredResume(db, jobId, status = 'ready') {
 }
 
 describe('renderJobTable', () => {
+  it('renders job titles with stored URLs as external links', () => {
+    const html = renderJobTable([
+      {
+        id: 'job-linked',
+        title: 'Platform Engineer',
+        company: 'Acme',
+        url: 'https://example.com/jobs/linked',
+        location: 'Remote',
+        description: '',
+        status: 'pending',
+        stage: '',
+        score: 8,
+      },
+    ], {}, {}, 'all', 'score', '', null);
+
+    assert.match(html, /<div class="job-title"><a href="https:\/\/example\.com\/jobs\/linked" target="_blank" rel="noreferrer">Platform Engineer<\/a><\/div>/);
+  });
+
+  it('renders blank-url job titles as saved JD buttons instead of empty links', () => {
+    const html = renderJobTable([
+      {
+        id: 'job-missing-url',
+        title: 'Cloud Enablement Engineer',
+        company: 'Quanata',
+        url: '',
+        location: 'Remote',
+        description: 'Build cloud platforms',
+        status: 'applied',
+        stage: 'applied',
+        score: 9,
+      },
+    ], {}, {}, 'applied', 'score', '', null);
+
+    assert.doesNotMatch(html, /href=""/);
+    assert.doesNotMatch(html, /<div class="job-title"><a /);
+    assert.match(html, /class="job-title-missing-url"/);
+    assert.match(html, /onclick="openJobDescription\(&quot;job-missing-url&quot;,&quot;Cloud Enablement Engineer&quot;,&quot;Quanata&quot;\)"/);
+  });
+
   it('renders company badges with stable ordering and an applied-date badge', () => {
     const html = renderJobTable([
       {
