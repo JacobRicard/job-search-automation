@@ -11,5 +11,3 @@ Sibling primitives in this directory:
 - `page-checks.js` detect closed/expired/error pages
 - `preflight.js` validate applicant config before launching
 - `utils.js` shared `sleep` and `DELAYS` constants
-
-If you want the interactive flow where Claude reads each form question and generates an answer at runtime, see `lib/apply/` instead.
