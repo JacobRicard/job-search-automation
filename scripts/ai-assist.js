@@ -55,11 +55,9 @@ async function main(argv = process.argv.slice(2)) {
   }
 
   const { getDb } = require('../lib/db');
-  const { applyWithPlatform, detectPlatform } = require('../lib/auto-applier');
-  const { pickResume } = require('../lib/apply/shared');
+  const { applyWithPlatform, buildApplicantForJob, detectPlatform } = require('../lib/auto-applier');
   const { recordAutoApplyAttempt } = require('../lib/auto-apply-receipts');
   const { waitForApplicationConfirmation } = require('../lib/gmail-code');
-  const applicantDefaults = require('../config/applicant');
   const { baseDir } = require('../config/paths');
 
   const db = getDb();
@@ -112,7 +110,7 @@ async function main(argv = process.argv.slice(2)) {
   const unresolvedFields = questions.filter((q) => answers[q.name] == null);
   log.info('Override loaded', { fieldCount: questions.length, unresolvedCount: unresolvedFields.length });
 
-  const applicant = { ...applicantDefaults, resumePath: pickResume(job) };
+  const applicant = buildApplicantForJob(job);
 
   log.info('Starting applyWithPlatform', { mode: 'assist', platform });
   let result;

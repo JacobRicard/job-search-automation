@@ -1,9 +1,9 @@
 # ats-appliers/
 
-End to end auto-apply per ATS. Each module exports `applyXxx(job, applicant, ...)` and owns its own browser lifecycle: launch, navigate, fill, submit, wait for confirmation, screenshot, log a receipt. Answers come from rule tables (e.g. `SIMPLE_GREENHOUSE_QUESTION_RULES` in `greenhouse.js`), not from a model at runtime.
+Browser automation helpers per ATS. Each module exports `applyXxx(job, applicant, ...)` and owns its own browser lifecycle: launch, navigate, fill, screenshot, and assist-mode handoff for user review. Answers are passed in from generated application prep.
 
 Consumers:
-- `lib/auto-applier.js` (the batch auto-apply pipeline)
+- `lib/auto-applier.js` (reviewed assist bridge)
 - `scripts/apply-extract.js`
 
 Sibling primitives in this directory:

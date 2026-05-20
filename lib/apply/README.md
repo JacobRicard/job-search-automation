@@ -8,6 +8,4 @@ Consumers:
 - `lib/auto-applier.js` (uses `shared.js` for keyword constants)
 - `lib/dashboard-routes.js`
 
-Browser primitives, page checks, and preflight live in `lib/ats-appliers/` and are imported from there.
-
-If you want the fully autonomous batch flow with rule-based answers, see `lib/ats-appliers/` instead.
+Browser primitives, page checks, and preflight live in `lib/ats-appliers/` and are imported from there. There is no autonomous batch apply command; final submission stays under user review.

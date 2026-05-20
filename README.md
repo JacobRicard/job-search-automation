@@ -123,7 +123,7 @@ Dashboard views:
 - **Interviewing** — phone screen, interview, onsite, and offer stages.
 - **Rejected / Closed / Ghosted / Archived** — terminal or hidden-state queues.
 - **Stats** — funnel, score calibration, recent events, rejection timing, and apply receipt summaries.
-- **Apply Receipts** — auto-apply or assisted-apply attempt log with status, platform, mode, failure class, score, age, screenshots, and resume artifacts.
+- **Apply Receipts** — assisted-apply attempt log with status, platform, mode, failure class, score, age, screenshots, and resume artifacts.
 - **Event Log** — audit trail from stage, outreach, and archive changes.
 - **Market Research** — aggregate JD analysis against the active profile, including seniority, location, top skills, strategy score, and emerging high-score signals.
 
@@ -312,7 +312,7 @@ Create a launchd LaunchAgent pointing at `scripts/start-dashboard.sh` with `Keep
 
 **New filter tab:** add to `FILTER_DEFS` in `lib/html/helpers.js`, add a corresponding query in `filterQueries` in `lib/dashboard-routes.js`.
 
-**Assisted apply internals:** `lib/ats-appliers/*` and `lib/auto-applier.js` are preserved as dormant infrastructure for future reviewed or semi-automatic workflows. They are not part of the active daily pipeline or dashboard actions.
+**Assisted apply internals:** reviewed browser-fill support for Greenhouse, Lever, and Ashby lives in `lib/ats-appliers/*` behind `lib/auto-applier.js`. The active workflow keeps final submission under human control.
 
 **Scoring calibration:** edit the prompt in `scorer.js`. Deterministic caps live in `scoreJob()`; use those for "never over-score this pattern" rules the LLM keeps rationalizing past.
 

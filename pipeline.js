@@ -14,7 +14,7 @@ const { requireEnv } = require('./lib/env');
 const {
   getDb,
   getExistingJobKeys,
-  insertJob,
+  importJob,
   getUnscoredJobs,
   markJobScoreAttempt,
   markJobScoreFailure,
@@ -30,6 +30,26 @@ const { getHistoricalStageStats } = require('./lib/stage-stats');
 const logPaths = require('./lib/log-paths');
 const log = require('./lib/logger')('pipeline', { logFile: logPaths.daily('pipeline') });
 
+const DEFAULT_SCORE_SPIKE_THRESHOLD = 50;
+
+function envFlag(value) {
+  return value === '1' || String(value).toLowerCase() === 'true';
+}
+
+function getScoringPlan(candidates, env = process.env) {
+  const threshold = parseInt(env.SCORE_SPIKE_THRESHOLD, 10) || DEFAULT_SCORE_SPIKE_THRESHOLD;
+  const allowSpike = envFlag(env.ALLOW_SCORE_SPIKE);
+  const skipForSpike = candidates.length > threshold && !allowSpike;
+
+  return {
+    threshold,
+    allowSpike,
+    skipForSpike,
+    candidates: candidates.length,
+    jobs: skipForSpike ? [] : candidates,
+  };
+}
+
 function hasPrimaryDuplicate(db, job) {
   return Boolean(db.prepare(`
     SELECT 1
@@ -37,8 +57,9 @@ function hasPrimaryDuplicate(db, job) {
     WHERE LOWER(TRIM(title)) = LOWER(TRIM(?))
       AND LOWER(TRIM(company)) = LOWER(TRIM(?))
       AND LOWER(COALESCE(platform, '')) IN ('ashby', 'greenhouse', 'lever', 'workday')
+      AND id != ?
     LIMIT 1
-  `).get(job.title || '', job.company || ''));
+  `).get(job.title || '', job.company || '', job.id || ''));
 }
 
 async function generateSummary(newJobs) {
@@ -104,15 +125,30 @@ async function run() {
   const insertAndDedup = db.transaction((scraped) => {
     let skipped = 0;
     let inserted = 0;
+    let refreshed = 0;
+    let reopened = 0;
+    const reopenArchivedForRescore = envFlag(process.env.REOPEN_ARCHIVED_FOR_RESCORE);
     for (const j of scraped) {
       const key = (j.title || '').trim().toLowerCase() + '|||' + (j.company || '').trim().toLowerCase();
-      if (existing.has(key) && (!isPrimaryPlatform(j.platform) || hasPrimaryDuplicate(db, j))) { skipped++; continue; }
-      existing.add(key); // prevent intra-batch dupes
-      if (insertJob(db, j)) inserted++;
+      const primary = isPrimaryPlatform(j.platform);
+      const sameIdExists = primary && Boolean(db.prepare('SELECT 1 FROM jobs WHERE id = ?').get(j.id || ''));
+      if (existing.has(key) && (!primary || (!sameIdExists && hasPrimaryDuplicate(db, j)))) { skipped++; continue; }
+      if (!sameIdExists) existing.add(key); // prevent intra-batch dupes
+      const result = importJob(db, j, { reopenArchivedForRescore });
+      if (result.inserted) inserted++;
+      if (result.refreshed) refreshed++;
+      if (result.reopened) reopened++;
     }
     if (skipped > 0) {
       log.info('Skipped pre-existing duplicates', { count: skipped });
     }
+    log.info('Import summary', {
+      inserted,
+      skipped,
+      refreshed,
+      reopened,
+      reopenArchivedForRescore,
+    });
 
     // Auto-archive re-posts where the older version was just dismissed (no stage)
     const dedupResult = db.prepare(`
@@ -172,9 +208,9 @@ async function run() {
       log.info('Auto-archived alternate-source duplicates (prefer primary ATS)', { count: alternateDupesResult.changes });
     }
 
-    return { inserted, skipped };
+    return { inserted, skipped, refreshed, reopened };
   });
-  const { inserted, skipped } = insertAndDedup(scraped);
+  const { inserted, skipped, refreshed, reopened } = insertAndDedup(scraped);
 
   // Score unscored jobs, respecting the daily API quota
   const todayStr = new Date().toLocaleDateString('en-CA');
@@ -182,9 +218,23 @@ async function run() {
     "SELECT COALESCE(SUM(call_count), 0) as n FROM api_usage WHERE date = ? AND model = ?"
   ).get(todayStr, MODEL).n;
   const remainingQuota = Math.max(0, GEMINI_DAILY_LIMIT - usedToday - 10); // reserve 10 for summary + retries
-  const toScore = getUnscoredJobs(db, { limit: remainingQuota });
+  const scoringCandidates = getUnscoredJobs(db, { limit: remainingQuota });
+  const scoringPlan = getScoringPlan(scoringCandidates);
+  const toScore = scoringPlan.jobs;
   if (usedToday > 0 || remainingQuota < GEMINI_DAILY_LIMIT) {
-    log.info('Daily quota check', { usedToday, remainingQuota, toScore: toScore.length });
+    log.info('Daily quota check', {
+      usedToday,
+      remainingQuota,
+      toScore: scoringCandidates.length,
+      scoringQueued: toScore.length,
+    });
+  }
+  if (scoringPlan.skipForSpike) {
+    log.warn('Scoring spike guard tripped', {
+      candidates: scoringPlan.candidates,
+      threshold: scoringPlan.threshold,
+      allowOverride: 'ALLOW_SCORE_SPIKE=1',
+    });
   }
 
   const archiveThreshold = parseInt(process.env.AUTO_ARCHIVE_THRESHOLD, 10) || 4;
@@ -228,7 +278,10 @@ async function run() {
     scraped: scraped.length,
     inserted,
     skipped,
+    refreshed,
+    reopened,
     scored: toScore.length,
+    scoringSkipped: scoringPlan.skipForSpike ? scoringPlan.candidates : 0,
   });
   log.info('Daily summary', { summary });
 
@@ -264,4 +317,4 @@ if (require.main === module) {
   });
 }
 
-module.exports = { run, hasPrimaryDuplicate };
+module.exports = { run, hasPrimaryDuplicate, getScoringPlan };
