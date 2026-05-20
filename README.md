@@ -125,7 +125,7 @@ Dashboard views:
 - **Stats** — funnel, score calibration, recent events, rejection timing, and apply receipt summaries.
 - **Apply Receipts** — auto-apply or assisted-apply attempt log with status, platform, mode, failure class, score, age, screenshots, and resume artifacts.
 - **Event Log** — audit trail from stage, outreach, and archive changes.
-- **Market Research** — aggregate JD analysis against the active profile, including seniority, location, skill clusters, strategy score, and emerging high-score signals.
+- **Market Research** — aggregate JD analysis against the active profile, including seniority, location, top skills, strategy score, and emerging high-score signals.
 
 Job card actions:
 
