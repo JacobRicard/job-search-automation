@@ -28,7 +28,7 @@ class FakeDb {
     if (!match) throw new Error(`Unsupported pragma: ${query}`);
 
     const tableName = match[1];
-    this.ensureTable(tableName);
+    if (!this.tables.has(tableName)) return [];
     return [...this.tables.get(tableName)].map((name) => ({ name }));
   }
 
@@ -63,6 +63,21 @@ class FakeDb {
       const [, tableName, columnName] = alterTableMatch;
       this.ensureTable(tableName);
       this.tables.get(tableName).add(columnName);
+      return;
+    }
+
+    const dropColumnMatch = statement.match(/^ALTER TABLE (\w+) DROP COLUMN (\w+)$/);
+    if (dropColumnMatch) {
+      const [, tableName, columnName] = dropColumnMatch;
+      if (this.tables.has(tableName)) this.tables.get(tableName).delete(columnName);
+      return;
+    }
+
+    const dropTableMatch = statement.match(/^DROP TABLE IF EXISTS (\w+)$/);
+    if (dropTableMatch) {
+      const [, tableName] = dropTableMatch;
+      this.tables.delete(tableName);
+      this.rows.delete(tableName);
       return;
     }
 
@@ -200,37 +215,24 @@ describe('db schema helpers', () => {
 
     const schemaVersion = db.prepare("SELECT value FROM metadata WHERE key = 'schema_version'").get();
     const jobColumns = getColumnNames(db, 'jobs');
-    const autoApplyColumns = getColumnNames(db, 'auto_apply_log');
-    const autoApplyRunColumns = getColumnNames(db, 'auto_apply_runs');
-    const applicationPrepColumns = getColumnNames(db, 'application_preps');
     const rejectionEmailColumns = getColumnNames(db, 'rejection_email_log');
-    const tailoredResumeColumns = getColumnNames(db, 'tailored_resumes');
     const jobAliasColumns = getColumnNames(db, 'job_aliases');
 
     assert.equal(Number(schemaVersion.value), MIGRATIONS.length);
     assert.ok(jobColumns.has('rejection_reasoning'));
-    assert.ok(jobColumns.has('auto_apply_status'));
     assert.ok(jobColumns.has('score_attempts'));
     assert.ok(jobColumns.has('last_score_attempt_at'));
     assert.ok(jobColumns.has('score_error'));
-    assert.ok(autoApplyColumns.has('resume_filename'));
-    assert.ok(autoApplyColumns.has('dry_run'));
-    assert.ok(autoApplyColumns.has('failure_class'));
-    assert.ok(autoApplyColumns.has('pre_image_path'));
-    assert.ok(autoApplyColumns.has('resume_path'));
-    assert.ok(autoApplyColumns.has('details_json'));
-    assert.ok(autoApplyRunColumns.has('started_at'));
-    assert.ok(autoApplyRunColumns.has('summary_json'));
-    assert.ok(applicationPrepColumns.has('workflow'));
-    assert.ok(applicationPrepColumns.has('answers_json'));
-    assert.ok(applicationPrepColumns.has('voice_checks_json'));
+    assert.equal(jobColumns.has('auto_applied_at'), false);
+    assert.equal(jobColumns.has('auto_apply_status'), false);
+    assert.equal(jobColumns.has('auto_apply_error'), false);
+    assert.equal(db.tables.has('auto_apply_log'), false);
+    assert.equal(db.tables.has('auto_apply_runs'), false);
+    assert.equal(db.tables.has('application_preps'), false);
+    assert.equal(db.tables.has('tailored_resumes'), false);
     assert.ok(rejectionEmailColumns.has('uid_validity'));
     assert.ok(rejectionEmailColumns.has('matched_job_id'));
     assert.ok(rejectionEmailColumns.has('match_status'));
-    assert.ok(tailoredResumeColumns.has('job_id'));
-    assert.ok(tailoredResumeColumns.has('source_variant'));
-    assert.ok(tailoredResumeColumns.has('resume_pdf_path'));
-    assert.ok(tailoredResumeColumns.has('keywords_json'));
     assert.ok(jobAliasColumns.has('alternate_job_id'));
     assert.ok(jobAliasColumns.has('canonical_job_id'));
     assert.ok(jobAliasColumns.has('evidence_json'));

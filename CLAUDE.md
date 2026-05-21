@@ -1,6 +1,6 @@
 # Claude Instructions
 
-This repo is a personal job-search pipeline. It scrapes job boards, scores listings with an LLM, serves a local dashboard, generates manual application prep, and creates tailored resumes. Final application submission is human-controlled.
+This repo is a personal job-search pipeline. It scrapes job boards, scores listings with an LLM, and serves a local dashboard for manual review and pipeline tracking. Application submission and applied status are human-controlled.
 
 ## Context system
 
@@ -60,7 +60,7 @@ Commit message format: `<type>: <brief summary>` — types: `feat`, `fix`, `refa
 - `jobs.json` (auto-generated)
 - `jobs.db` (per-profile SQLite)
 - `.env` files
-- Auto-generated build artifacts (`*.pdf`, `public/bookmarklet.js`)
+- Auto-generated build artifacts (`*.pdf`)
 - `market-research-cache.json`, `slug-health.json`, or any `*-cache.json`
 - Personal content under `.context/` or `profiles/<your-name>/` (both gitignored)
 

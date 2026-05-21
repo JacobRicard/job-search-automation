@@ -29,13 +29,6 @@ function createDb() {
       to_value TEXT,
       created_at TEXT
     );
-    CREATE TABLE auto_apply_log (
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
-      job_id TEXT,
-      attempted_at TEXT,
-      status TEXT,
-      dry_run INTEGER DEFAULT 0
-    );
   `);
   return db;
 }
@@ -54,28 +47,24 @@ describe('dashboard insights', () => {
     ]);
   });
 
-  it('reports today activity counts without double-counting auto-applies as manual applies', () => {
+  it('reports today activity counts from stage-change events', () => {
     const db = createDb();
-    for (const id of ['manual', 'auto', 'rejected', 'closed']) {
+    for (const id of ['manual', 'rejected', 'closed']) {
       db.prepare('INSERT INTO jobs (id, platform, status, created_at) VALUES (?, ?, ?, ?)').run(id, 'Lever', 'pending', '2026-04-15T12:00:00Z');
     }
 
     db.prepare('INSERT INTO events (job_id, event_type, to_value, created_at) VALUES (?, ?, ?, ?)').run('manual', 'stage_change', 'applied', '2026-04-15T14:00:00Z');
     db.prepare('INSERT INTO events (job_id, event_type, to_value, created_at) VALUES (?, ?, ?, ?)').run('rejected', 'stage_change', 'rejected', '2026-04-15T15:00:00Z');
     db.prepare('INSERT INTO events (job_id, event_type, to_value, created_at) VALUES (?, ?, ?, ?)').run('closed', 'stage_change', 'closed', '2026-04-15T16:00:00Z');
-    db.prepare('INSERT INTO auto_apply_log (job_id, attempted_at, status, dry_run) VALUES (?, ?, ?, ?)').run('auto', '2026-04-15T17:00:00Z', 'success', 0);
-    db.prepare('INSERT INTO auto_apply_log (job_id, attempted_at, status, dry_run) VALUES (?, ?, ?, ?)').run('auto', '2026-04-15T18:00:00Z', 'success', 1);
-    db.prepare('INSERT INTO auto_apply_log (job_id, attempted_at, status, dry_run) VALUES (?, ?, ?, ?)').run('auto', '2026-04-15T19:00:00Z', 'failed', 0);
 
     assert.deepEqual(getTodayActivityCounts(db, '2026-04-15'), {
       todayApplied: 1,
-      todayAutoApplied: 1,
       todayRejected: 1,
       todayClosed: 1,
     });
   });
 
-  it('builds the manual apply chart from stage-change events', () => {
+  it('builds the apply chart from stage-change events', () => {
     const db = createDb();
     db.prepare('INSERT INTO jobs (id, platform, status, created_at) VALUES (?, ?, ?, ?)').run('j1', 'Lever', 'pending', '2026-04-13T12:00:00Z');
     db.prepare('INSERT INTO jobs (id, platform, status, created_at) VALUES (?, ?, ?, ?)').run('j2', 'Lever', 'pending', '2026-04-14T12:00:00Z');
@@ -83,7 +72,6 @@ describe('dashboard insights', () => {
 
     db.prepare('INSERT INTO events (job_id, event_type, to_value, created_at) VALUES (?, ?, ?, ?)').run('j1', 'stage_change', 'applied', '2026-04-13T15:00:00Z');
     db.prepare('INSERT INTO events (job_id, event_type, to_value, created_at) VALUES (?, ?, ?, ?)').run('j3', 'stage_change', 'applied', '2026-04-15T15:00:00Z');
-    db.prepare('INSERT INTO auto_apply_log (job_id, attempted_at, status, dry_run) VALUES (?, ?, ?, ?)').run('j2', '2026-04-14T15:00:00Z', 'success', 0);
 
     const counts = getDailyManualApplyCounts(db, 3, new Date('2026-04-15T16:00:00Z'));
     assert.deepEqual(counts.map(row => row.count), [1, 0, 1]);
