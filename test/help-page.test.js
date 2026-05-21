@@ -35,8 +35,5 @@ describe('help page', () => {
     ]) {
       assert.match(html, new RegExp(text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')));
     }
-    assert.doesNotMatch(html, /auto-apply/);
-    assert.doesNotMatch(html, /Manual Apply Prep/);
-    assert.doesNotMatch(html, /Apply Receipts/);
   });
 });

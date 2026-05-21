@@ -17,6 +17,7 @@ const { jobsJsonPath } = require('./config/paths');
 const logPaths = require('./lib/log-paths');
 const log = require('./lib/logger')('scraper', { logFile: logPaths.daily('scraper') });
 const { validateJobs } = require('./lib/validate');
+const { deriveJobId, validateWithPydantic } = require('./lib/job-lead');
 const { scrapeGreenhouse } = require('./scrapers/greenhouse');
 const { scrapeLever }      = require('./scrapers/lever');
 const { scrapeWorkable }   = require('./scrapers/workable');
@@ -30,7 +31,6 @@ const { scrapeWorkday }    = require('./scrapers/workday');
 const { scrapeBuiltin }    = require('./scrapers/builtin');
 const { scrapeRippling }   = require('./scrapers/rippling');
 
-const { isLocationAllowed } = require('./lib/location-filter');
 const { MAX_AGE_DAYS }      = require('./config/companies');
 
 const MS_PER_DAY = 86_400_000;
@@ -85,33 +85,34 @@ async function scrapeAll() {
     r.status === 'fulfilled' ? validateJobs(r.value, label) : []
   );
 
-  // Deduplicate by URL within this batch (DB-level dedup happens in pipeline.js)
+  // Deduplicate by derived internal id within this batch (DB-level dedup happens in pipeline.js)
   const seen = new Set();
   const unique = allJobs.filter((j) => {
-    if (!j.url || seen.has(j.url)) return false;
-    seen.add(j.url);
+    if (!j.direct_apply_url) return false;
+    const key = deriveJobId(j);
+    if (seen.has(key)) return false;
+    seen.add(key);
     return true;
   });
 
-  // Age filter: keep if new to DB (not in knownIds) OR recently posted.
+  // Age filter: keep if new to DB (not in knownIds) OR recently scraped.
   // A caller may write existing job IDs to /tmp/known_job_ids.json before scraping.
   let knownIds = new Set();
   try {
     knownIds = new Set(JSON.parse(fs.readFileSync('/tmp/known_job_ids.json', 'utf8')));
   } catch {}
-  const ageFiltered = unique.filter((j) => !knownIds.has(j.id) || isRecent(j.postedAt || ''));
-
-  const locationFiltered = ageFiltered.filter((j) => isLocationAllowed(j.location));
+  const ageFiltered = unique.filter((j) => !knownIds.has(deriveJobId(j)) || isRecent(j.scraped_timestamp || ''));
+  const validated = validateWithPydantic(ageFiltered);
 
   log.info('Scrape complete', {
     beforeFilter: unique.length,
-    afterFilter: locationFiltered.length,
+    afterFilter: validated.length,
   });
 
-  // Write raw jobs to jobs.json — ATS resolution happens in pipeline.js
-  fs.writeFileSync(jobsJsonPath, JSON.stringify(locationFiltered, null, 2));
+  // Write strict JobLead records to jobs.json — ATS resolution happens in pipeline.js
+  fs.writeFileSync(jobsJsonPath, JSON.stringify(validated, null, 2));
 
-  return locationFiltered;
+  return validated;
 }
 
 // Run standalone

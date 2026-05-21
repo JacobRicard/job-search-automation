@@ -4,6 +4,7 @@ const { stripHtml } = require('../lib/utils');
 const { scrapeCompanies } = require('../lib/base-scraper');
 const { ASHBY_COMPANIES } = require('../config/companies');
 const { MAX_DESCRIPTION_LENGTH } = require('../config/constants');
+const { makeJobLead } = require('../lib/job-lead');
 
 async function scrapeAshby() {
   return scrapeCompanies({
@@ -19,16 +20,14 @@ async function scrapeAshby() {
         || '';
       const description = (salarySummary ? `Compensation: ${salarySummary}\n\n${baseDesc}` : baseDesc)
         .slice(0, MAX_DESCRIPTION_LENGTH);
-      return {
-        id: `ashby-${job.id}`,
-        platform: 'Ashby',
+      return makeJobLead({
         title: job.title,
         company: job.companyName || company,
-        url: job.jobUrl,
-        postedAt: job.publishedAt,
+        directApplyUrl: job.jobUrl,
+        atsPlatformName: 'Ashby',
+        scrapedTimestamp: new Date().toISOString(),
         description,
-        location: job.location || job.address?.postalAddress?.addressLocality || (job.isRemote ? 'Remote' : ''),
-      };
+      });
     },
   });
 }

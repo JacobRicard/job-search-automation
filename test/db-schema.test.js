@@ -223,6 +223,7 @@ describe('db schema helpers', () => {
     assert.ok(jobColumns.has('score_attempts'));
     assert.ok(jobColumns.has('last_score_attempt_at'));
     assert.ok(jobColumns.has('score_error'));
+    assert.ok(jobColumns.has('scraped_at'));
     assert.equal(jobColumns.has('auto_applied_at'), false);
     assert.equal(jobColumns.has('auto_apply_status'), false);
     assert.equal(jobColumns.has('auto_apply_error'), false);

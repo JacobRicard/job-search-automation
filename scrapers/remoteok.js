@@ -3,6 +3,7 @@
 const { stripHtml, safeFetch } = require('../lib/utils');
 const { detectAts } = require('../lib/atsDetector');
 const { matchesSearchTerms } = require('../lib/scraper-utils');
+const { makeJobLead } = require('../lib/job-lead');
 
 async function scrapeRemoteOK() {
   const jobs = [];
@@ -26,16 +27,14 @@ async function scrapeRemoteOK() {
     const ats = detectAts(job.apply_url);
     const canonicalUrl = ats ? job.apply_url : (job.url || `https://remoteok.com/remote-jobs/${job.slug}`);
 
-    jobs.push({
-      id: `remoteok-${job.id}`,
-      platform: ats ? ats.platform : 'RemoteOK',
+    jobs.push(makeJobLead({
       title,
       company: job.company || '',
-      url: canonicalUrl,
-      postedAt: job.date || new Date().toISOString(),
+      directApplyUrl: canonicalUrl,
+      atsPlatformName: ats ? ats.platform : 'RemoteOK',
+      scrapedTimestamp: new Date().toISOString(),
       description: stripHtml(job.description || ''),
-      location: 'Remote',
-    });
+    }));
   }
 
   return jobs;

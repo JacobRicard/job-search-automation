@@ -3,6 +3,7 @@
 const { stripHtml } = require('../lib/utils');
 const { scrapeCompanies } = require('../lib/base-scraper');
 const { GREENHOUSE_COMPANIES } = require('../config/companies');
+const { makeJobLead } = require('../lib/job-lead');
 
 async function scrapeGreenhouse() {
   return scrapeCompanies({
@@ -11,15 +12,13 @@ async function scrapeGreenhouse() {
     buildUrl: (company) => `https://boards-api.greenhouse.io/v1/boards/${company}/jobs?content=true`,
     parseResponse: (data) => data.jobs || [],
     matchField: (job) => job.title,
-    mapJob: (job, company) => ({
-      id: `greenhouse-${job.id}`,
-      platform: 'Greenhouse',
+    mapJob: (job, company) => makeJobLead({
       title: job.title,
       company: company,
-      url: job.absolute_url,
-      postedAt: job.updated_at,
+      directApplyUrl: job.absolute_url,
+      atsPlatformName: 'Greenhouse',
+      scrapedTimestamp: new Date().toISOString(),
       description: stripHtml(job.content || ''),
-      location: (job.location?.name) || '',
     }),
   });
 }

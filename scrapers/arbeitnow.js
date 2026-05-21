@@ -3,6 +3,7 @@
 const { stripHtml, safeFetch } = require('../lib/utils');
 const { detectAts } = require('../lib/atsDetector');
 const { matchesSearchTerms } = require('../lib/scraper-utils');
+const { makeJobLead } = require('../lib/job-lead');
 
 async function scrapeArbeitnow() {
   const jobs = [];
@@ -21,16 +22,14 @@ async function scrapeArbeitnow() {
     const jobUrl = job.url || '';
     const ats = detectAts(jobUrl);
 
-    jobs.push({
-      id: `arbeitnow-${job.slug}`,
-      platform: ats ? ats.platform : 'Arbeitnow',
+    jobs.push(makeJobLead({
       title,
       company: job.company_name || '',
-      url: jobUrl,
-      postedAt: new Date(job.created_at * 1000).toISOString(),
+      directApplyUrl: jobUrl,
+      atsPlatformName: ats ? ats.platform : 'Arbeitnow',
+      scrapedTimestamp: new Date().toISOString(),
       description: stripHtml(job.description || ''),
-      location: job.location || (job.remote ? 'Remote' : ''),
-    });
+    }));
   }
 
   return jobs;

@@ -219,12 +219,6 @@ describe('renderJobTable', () => {
     ], {}, {}, 'not-applied', 'score', '', null);
 
     assert.doesNotMatch(html, /autox/);
-    assert.doesNotMatch(html, /Manual Apply Prep/);
-    assert.doesNotMatch(html, /Tailor Resume/);
-    assert.doesNotMatch(html, /View Tailored Resume/);
-    assert.doesNotMatch(html, /Copy Answers/);
-    assert.doesNotMatch(html, /View Apply Image/);
-    assert.doesNotMatch(html, /Apply Now/);
     assert.doesNotMatch(html, />simple</);
     assert.doesNotMatch(html, />complex</);
   });

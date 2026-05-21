@@ -3,6 +3,7 @@
 const { stripHtml, safeFetch } = require('../lib/utils');
 const { detectAts } = require('../lib/atsDetector');
 const { matchesSearchTerms } = require('../lib/scraper-utils');
+const { makeJobLead } = require('../lib/job-lead');
 
 async function scrapeJobicy() {
   const jobs = [];
@@ -20,16 +21,14 @@ async function scrapeJobicy() {
     const jobUrl = job.url || '';
     const ats = detectAts(jobUrl);
 
-    jobs.push({
-      id: `jobicy-${job.id}`,
-      platform: ats ? ats.platform : 'Remotive',
+    jobs.push(makeJobLead({
       title,
       company: job.company_name || '',
-      url: jobUrl,
-      postedAt: job.publication_date || new Date().toISOString(),
+      directApplyUrl: jobUrl,
+      atsPlatformName: ats ? ats.platform : 'Remotive',
+      scrapedTimestamp: new Date().toISOString(),
       description: stripHtml(job.description || ''),
-      location: job.candidate_required_location || 'Remote',
-    });
+    }));
   }
 
   return jobs;
