@@ -10,4 +10,5 @@ Consumers:
 - `lib/auto-applier.js` (uses `shared.js` for keyword constants)
 
 Browser primitives, page checks, preflight, and ATS-specific fill behavior live
-in `lib/ats-appliers/`.
+in `lib/ats-appliers/`. There is no autonomous batch apply command; final
+submission stays under user review.

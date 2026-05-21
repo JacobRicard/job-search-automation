@@ -161,8 +161,6 @@ async function runAssist(db, flags) {
   const { prepareApplication } = require('../lib/application-prep');
   const { generateTailoredResume } = require('../lib/tailored-resume');
   const { recordAutoApplyAttempt } = require('../lib/auto-apply-receipts');
-  const { baseDir } = require('../config/paths');
-  const applicantDefaults = require('../config/applicant');
 
   const job = fetchJob(db, flags.job);
 
@@ -230,8 +228,7 @@ async function runAssist(db, flags) {
     }
   }
 
-  const { pickResume } = require('../lib/apply/shared');
-  const applicant = { ...applicantDefaults, resumePath: pickResume(job) };
+  const applicant = buildApplicantForJob(job);
   const refreshed = await refreshJobReadiness(db, job);
 
   // Step 3 — open browser

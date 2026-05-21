@@ -355,7 +355,7 @@ function closeAutoApplyAttempt() {
 async function openAutoApplyAttempt(id) {
   const modal = document.getElementById('auto-apply-attempt-modal');
   const body = document.getElementById('auto-apply-attempt-body');
-  document.getElementById('auto-apply-attempt-title').textContent = 'Auto-Apply Receipt #' + id;
+  document.getElementById('auto-apply-attempt-title').textContent = 'Apply Receipt #' + id;
   document.getElementById('auto-apply-attempt-sub').textContent = 'Loading…';
   body.textContent = 'Loading…';
   modal.classList.add('open');
@@ -367,7 +367,7 @@ async function openAutoApplyAttempt(id) {
       'Attempted: ' + (data.attempted_at || '—'),
       'Status: ' + (data.status || '—'),
       'Platform: ' + (data.platform || '—'),
-      'Mode: ' + (data.dry_run ? 'dry-run' : (data.mode || 'submit')),
+      'Mode: ' + (data.dry_run ? 'dry-run' : (data.mode || 'assist')),
       'Actor: ' + (data.actor || 'manual'),
       'Failure Class: ' + (data.failure_class || '—'),
       'PDF: ' + (data.resume_filename || '—'),
@@ -381,7 +381,7 @@ async function openAutoApplyAttempt(id) {
     body.textContent = lines.join('\n');
   } catch (error) {
     document.getElementById('auto-apply-attempt-sub').textContent = 'Failed to load';
-    body.textContent = 'Failed to load auto-apply receipt.';
+    body.textContent = 'Failed to load apply receipt.';
   }
 }
 
