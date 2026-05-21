@@ -216,10 +216,6 @@ describe('ATS alias DB merge', () => {
     );
     db.prepare("INSERT INTO events (job_id, event_type, from_value, to_value) VALUES (?, ?, ?, ?)")
       .run('builtin-1', 'stage_change', null, 'applied');
-    db.prepare(`
-      INSERT INTO application_preps (job_id, status, workflow, apply_url)
-      VALUES (?, ?, ?, ?)
-    `).run('builtin-1', 'ready', 'autofill', 'https://remoteok.com/job');
 
     const result = canonicalizeAlternateJob(db, db.prepare('SELECT * FROM jobs WHERE id = ?').get('builtin-1'), {
       status: 'primary',
@@ -255,11 +251,6 @@ describe('ATS alias DB merge', () => {
       db.prepare('SELECT COUNT(*) AS n FROM events WHERE job_id = ?').get('greenhouse-4677625005').n,
       2
     );
-    assert.equal(
-      db.prepare('SELECT job_id FROM application_preps WHERE apply_url = ?').get('https://remoteok.com/job').job_id,
-      'greenhouse-4677625005'
-    );
-
     const alias = db.prepare('SELECT * FROM job_aliases WHERE alternate_job_id = ?').get('builtin-1');
     assert.equal(alias.canonical_job_id, 'greenhouse-4677625005');
     assert.equal(alias.status, 'primary');

@@ -66,10 +66,9 @@ function toggleInsights() {
     if (!window._insightChart && typeof window.initDigestChart === 'function') window.initDigestChart();
     fetch('/api/insights').then(r => r.json()).then(data => {
       const items = drawer.querySelectorAll('.insight-stats .stat-item .stat-n');
-      if (items[0] != null) items[0].textContent = data.todayAutoApplied ?? 0;
-      if (items[1] != null) items[1].textContent = data.todayRejected ?? 0;
-      if (items[2] != null) items[2].textContent = data.todayClosed ?? 0;
-      if (items[3] != null) items[3].textContent = data.todayApplied ?? 0;
+      if (items[0] != null) items[0].textContent = data.todayRejected ?? 0;
+      if (items[1] != null) items[1].textContent = data.todayClosed ?? 0;
+      if (items[2] != null) items[2].textContent = data.todayApplied ?? 0;
       const digestEl = drawer.querySelector('.insight-text');
       if (digestEl && data.dailyDigest) digestEl.textContent = data.dailyDigest;
       if (window._insightChart && Array.isArray(data.dailyCounts)) {
@@ -130,34 +129,6 @@ function showToast(msg, color) {
   t.style.background = color || 'var(--green)';
   t.classList.add('show');
   setTimeout(() => t.classList.remove('show'), 2000);
-}
-
-function ensureJobBadges(card) {
-  const companyLine = card?.querySelector('.job-company');
-  if (!companyLine) return null;
-  let badges = companyLine.querySelector('.job-badges');
-  if (!badges) {
-    badges = document.createElement('span');
-    badges.className = 'job-badges';
-    companyLine.appendChild(badges);
-  }
-  return badges;
-}
-
-function setJobBadge(card, className, label, title) {
-  const badges = ensureJobBadges(card);
-  if (!badges) return;
-
-  let badge = badges.querySelector(`.${className}`);
-  if (!badge) {
-    badge = document.createElement('span');
-    badges.appendChild(badge);
-  }
-
-  badge.className = `complexity-badge ${className}`;
-  badge.textContent = label;
-  if (title) badge.title = title;
-  else badge.removeAttribute('title');
 }
 
 
@@ -245,32 +216,6 @@ async function archiveJob(id, btn) {
   }
 }
 
-async function tailorResume(id, btn) {
-  btn.disabled = true;
-  btn.textContent = 'Tailoring...';
-  const res = await fetch('/tailored-resume', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ id }),
-  });
-  if (res.ok) {
-    const data = await res.json();
-    const card = btn.closest('.job-card');
-    if (card) setJobBadge(card, 'auto-ready', 'resume', 'Tailored resume generated');
-    showToast('Tailored resume ready', '#16a34a');
-    if (data.resumeUrl) window.open(data.resumeUrl, '_blank', 'noopener,noreferrer');
-    btn.textContent = 'Tailor Resume';
-    btn.disabled = false;
-  } else {
-    const data = await res.json().catch(() => ({}));
-    const card = btn.closest('.job-card');
-    if (card) setJobBadge(card, 'auto-failed', 'resume!', data.error || 'Tailored resume failed');
-    showToast(`Resume failed: ${data.error || res.statusText}`, '#dc2626');
-    btn.disabled = false;
-    btn.textContent = 'Tailor Resume';
-  }
-}
-
 let _applyFiltersTimer = null;
 
 function applyFilters() {
@@ -344,57 +289,9 @@ document.getElementById('company-notes-modal').addEventListener('click', e => {
   if (e.target === document.getElementById('company-notes-modal')) closeCompanyNotes();
 });
 
-// ---------------------------------------------------------------------------
-// Auto-apply receipt modal
-// ---------------------------------------------------------------------------
-
-function closeAutoApplyAttempt() {
-  document.getElementById('auto-apply-attempt-modal').classList.remove('open');
-}
-
-async function openAutoApplyAttempt(id) {
-  const modal = document.getElementById('auto-apply-attempt-modal');
-  const body = document.getElementById('auto-apply-attempt-body');
-  document.getElementById('auto-apply-attempt-title').textContent = 'Apply Receipt #' + id;
-  document.getElementById('auto-apply-attempt-sub').textContent = 'Loading…';
-  body.textContent = 'Loading…';
-  modal.classList.add('open');
-
-  try {
-    const data = await fetch('/auto-apply-attempt?id=' + encodeURIComponent(id)).then(r => r.json());
-    const lines = [
-      data.company + ' - ' + data.title,
-      'Attempted: ' + (data.attempted_at || '—'),
-      'Status: ' + (data.status || '—'),
-      'Platform: ' + (data.platform || '—'),
-      'Mode: ' + (data.dry_run ? 'dry-run' : (data.mode || 'assist')),
-      'Actor: ' + (data.actor || 'manual'),
-      'Failure Class: ' + (data.failure_class || '—'),
-      'PDF: ' + (data.resume_filename || '—'),
-      'Security Code: ' + (data.security_code || '—'),
-      data.pre_image_path ? 'Pre Screenshot: ' + data.pre_image_path : null,
-      data.post_image_path ? 'Post Screenshot: ' + data.post_image_path : null,
-      '',
-      data.error ? 'Error:\n' + data.error : 'No error recorded.',
-    ].filter(Boolean);
-    document.getElementById('auto-apply-attempt-sub').textContent = (data.company || '') + ' · ' + (data.status || '');
-    body.textContent = lines.join('\n');
-  } catch (error) {
-    document.getElementById('auto-apply-attempt-sub').textContent = 'Failed to load';
-    body.textContent = 'Failed to load apply receipt.';
-  }
-}
-
-document.getElementById('auto-apply-attempt-modal').addEventListener('click', e => {
-  if (e.target === document.getElementById('auto-apply-attempt-modal')) closeAutoApplyAttempt();
-});
-
 document.addEventListener('keydown', e => {
   if (e.key === 'Escape') {
     closeCompanyNotes();
-    closeAutoApplyAttempt();
-    closeApplyImage();
-    closeQuestionsCopy();
     document.getElementById('jd-modal').style.display = 'none';
   }
 });
@@ -423,108 +320,6 @@ document.getElementById('jd-modal').addEventListener('click', e => {
 });
 
 // ---------------------------------------------------------------------------
-// Apply image modal
-// ---------------------------------------------------------------------------
-
-let _applyImageState = null;
-
-function closeApplyImage() {
-  const modal = document.getElementById('apply-image-modal');
-  const frame = document.getElementById('apply-image-frame');
-  const img = document.getElementById('apply-image-img');
-  const status = document.getElementById('apply-image-status');
-  const preTab = document.getElementById('apply-image-tab-pre');
-  const postTab = document.getElementById('apply-image-tab-post');
-  preTab.classList.remove('active');
-  postTab.classList.remove('active');
-  preTab.disabled = false;
-  postTab.disabled = false;
-  modal.classList.remove('open');
-  frame.classList.remove('visible');
-  frame.scrollTop = 0;
-  frame.scrollLeft = 0;
-  img.removeAttribute('src');
-  img.onerror = null;
-  img.onload = null;
-  status.textContent = '';
-  _applyImageState = null;
-}
-
-function setApplyImagePhase(phase) {
-  const frame = document.getElementById('apply-image-frame');
-  const img = document.getElementById('apply-image-img');
-  const status = document.getElementById('apply-image-status');
-  const preTab = document.getElementById('apply-image-tab-pre');
-  const postTab = document.getElementById('apply-image-tab-post');
-  if (!_applyImageState || !_applyImageState.available[phase]) return;
-  _applyImageState.phase = phase;
-  preTab.classList.toggle('active', phase === 'pre');
-  postTab.classList.toggle('active', phase === 'post');
-  status.textContent = phase === 'pre' ? 'Loading pre-apply screenshot…' : 'Loading post-apply screenshot…';
-  frame.classList.remove('visible');
-  frame.scrollTop = 0;
-  frame.scrollLeft = 0;
-  img.onerror = function () {
-    frame.classList.remove('visible');
-    status.textContent = phase === 'pre'
-      ? 'No pre-apply image found in logs for this job yet.'
-      : 'No post-apply image found in logs for this job yet.';
-  };
-  img.onload = function () {
-    status.textContent = '';
-    frame.classList.add('visible');
-  };
-  img.src = '/job-apply-image?id=' + encodeURIComponent(_applyImageState.id) + '&phase=' + encodeURIComponent(phase) + '&t=' + Date.now();
-}
-
-async function openApplyImage(id, title, company) {
-  const modal = document.getElementById('apply-image-modal');
-  const frame = document.getElementById('apply-image-frame');
-  const img = document.getElementById('apply-image-img');
-  const status = document.getElementById('apply-image-status');
-  const preTab = document.getElementById('apply-image-tab-pre');
-  const postTab = document.getElementById('apply-image-tab-post');
-  document.getElementById('apply-image-title').textContent = 'Apply Image';
-  document.getElementById('apply-image-sub').textContent = company + ' - ' + title;
-  _applyImageState = null;
-  frame.classList.remove('visible');
-  frame.scrollTop = 0;
-  frame.scrollLeft = 0;
-  img.removeAttribute('src');
-  img.onerror = null;
-  img.onload = null;
-  preTab.classList.remove('active');
-  postTab.classList.remove('active');
-  preTab.disabled = true;
-  postTab.disabled = true;
-  status.textContent = 'Loading…';
-  modal.classList.add('open');
-  try {
-    const data = await fetch('/job-apply-images?id=' + encodeURIComponent(id)).then(r => r.json());
-    const available = { pre: !!data.pre, post: !!data.post };
-    _applyImageState = {
-      id,
-      available,
-      phase: data.defaultPhase || (available.pre ? 'pre' : available.post ? 'post' : null),
-    };
-    preTab.disabled = !available.pre;
-    postTab.disabled = !available.post;
-    if (!_applyImageState.phase) {
-      status.textContent = 'No apply images found in logs for this job yet.';
-      frame.classList.remove('visible');
-      return;
-    }
-    setApplyImagePhase(_applyImageState.phase);
-  } catch (e) {
-    status.textContent = 'Failed to load apply images.';
-  }
-}
-
-document.getElementById('apply-image-modal').addEventListener('click', e => {
-  if (e.target === document.getElementById('apply-image-modal')) closeApplyImage();
-});
-
-// ---------------------------------------------------------------------------
 // Score comparison pagination (analytics page)
 // ---------------------------------------------------------------------------
 
@@ -543,74 +338,3 @@ document.getElementById('apply-image-modal').addEventListener('click', e => {
   window.pageComparison = function (d) { page = Math.max(0, Math.min(pages - 1, page + d)); show(); };
   show();
 })();
-
-// ---------------------------------------------------------------------------
-// Questions copy modal
-// ---------------------------------------------------------------------------
-
-function closeQuestionsCopy() {
-  document.getElementById('questions-copy-modal').classList.remove('open');
-}
-
-async function copyQA(text, btn) {
-  var orig = btn.textContent;
-  try {
-    if (navigator.clipboard && window.isSecureContext) {
-      await navigator.clipboard.writeText(text);
-    } else {
-      var ta = document.createElement('textarea');
-      ta.value = text;
-      ta.setAttribute('readonly', '');
-      ta.style.position = 'fixed';
-      ta.style.top = '-9999px';
-      document.body.appendChild(ta);
-      ta.focus();
-      ta.select();
-      var ok = document.execCommand('copy');
-      document.body.removeChild(ta);
-      if (!ok) { window.prompt('Copy manually:', text); return; }
-    }
-    btn.textContent = 'Copied!';
-    btn.style.background = 'var(--green)';
-    setTimeout(function () { btn.textContent = orig; btn.style.background = ''; }, 1400);
-  } catch (_) {
-    window.prompt('Copy manually:', text);
-  }
-}
-
-async function openQuestionsCopy(id, title, company) {
-  var modal = document.getElementById('questions-copy-modal');
-  var list = document.getElementById('questions-copy-list');
-  document.getElementById('questions-copy-title').textContent = title;
-  document.getElementById('questions-copy-sub').textContent = company;
-  list.textContent = 'Loading…';
-  modal.classList.add('open');
-  try {
-    var data = await fetch('/job-application-data?id=' + encodeURIComponent(id)).then(function (r) { return r.json(); });
-    var questions = data.questions || [];
-    var answers = data.answers || {};
-    if (!questions.length) {
-      list.innerHTML = '<p style="color:var(--text-muted);font-size:13px;padding:8px 0">No questions found for this job.</p>';
-      return;
-    }
-    list.innerHTML = questions.map(function (q) {
-      var ans = answers[q.name] != null ? String(answers[q.name]) : '';
-      var safeLabel = q.label.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
-      var safeAns = ans.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
-      var escaped = ans.replace(/\\/g,'\\\\').replace(/'/g,"\\'").replace(/\n/g,'\\n');
-      return '<div class="qcopy-row">'
-        + '<span class="qcopy-label">' + safeLabel + '</span>'
-        + '<div class="qcopy-answer-row">'
-        + '<div class="qcopy-answer">' + (safeAns || '<em style="color:var(--text-muted)">no answer</em>') + '</div>'
-        + (ans ? '<button class="qcopy-btn" onclick="copyQA(\'' + escaped + '\', this)">Copy</button>' : '')
-        + '</div>'
-        + '</div>';
-    }).join('');
-  } catch (_) {
-    list.innerHTML = '<p style="color:var(--red);font-size:13px;padding:8px 0">Failed to load questions.</p>';
-  }
-}
-
-document.getElementById('questions-copy-modal').addEventListener('click', function (e) {
-  if (e.target === document.getElementById('questions-copy-modal')) closeQuestionsCopy();
-});

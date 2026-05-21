@@ -1666,24 +1666,6 @@ td {
   border: 1px solid rgba(251, 146, 60, 0.3);
 }
 
-.complexity-badge.auto-applied {
-  background: rgba(16, 185, 129, 0.12);
-  color: #10b981;
-  border: 1px solid rgba(16, 185, 129, 0.25);
-}
-
-.complexity-badge.auto-ready {
-  background: rgba(59, 130, 246, 0.12);
-  color: #93c5fd;
-  border: 1px solid rgba(59, 130, 246, 0.25);
-}
-
-.complexity-badge.auto-failed {
-  background: rgba(239, 68, 68, 0.1);
-  color: var(--red);
-  border: 1px solid rgba(239, 68, 68, 0.2);
-}
-
 /* ── Help Page ───────────────────────────────────────────────────── */
 
 .help-page-header {

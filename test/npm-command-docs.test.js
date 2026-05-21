@@ -25,7 +25,7 @@ describe('npm command docs', () => {
       'daily',
       'dashboard',
       'scraping-scoring',
-      'application',
+      'resume',
       'maintenance',
     ]);
 
@@ -35,8 +35,7 @@ describe('npm command docs', () => {
       'npm start',
       'npm run scrape',
       'npm run pipeline',
-      'npm run apply -- list',
-      'npm run apply -- prep --job=<id>',
+      'npm run resume',
       'npm run sync-rejections',
       'npm test',
     ]) {
@@ -53,14 +52,14 @@ describe('npm command docs', () => {
     assert.match(output, /NPM Commands/);
     assert.match(output, /npm run daily/);
     assert.match(output, /Runs the same full active-profile refresh as npm run refresh/);
-    assert.match(output, /npm run apply -- list/);
-    assert.match(output, /--min-score=<n>/);
+    assert.match(output, /npm run resume/);
+    assert.match(output, /--limit=<n>/);
   });
 
   it('filters by group or search text', () => {
-    const applyGroups = filterCommandGroups('application');
-    assert.deepEqual(applyGroups.map((group) => group.id), ['application']);
-    assert.ok(flattenCommands(applyGroups).some((item) => item.command === 'npm run apply -- show --job=<id>'));
+    const resumeGroups = filterCommandGroups('resume');
+    assert.deepEqual(resumeGroups.map((group) => group.id), ['resume']);
+    assert.ok(flattenCommands(resumeGroups).some((item) => item.command === 'npm run resume'));
 
     const syncGroups = filterCommandGroups('sync-rejections');
     const syncCommands = flattenCommands(syncGroups);

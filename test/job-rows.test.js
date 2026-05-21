@@ -8,7 +8,7 @@ const { describe, it } = require('node:test');
 const assert = require('node:assert/strict');
 
 const { applyBaseSchema, applyMigrations } = require('../lib/db/schema');
-const { fetchFilteredJobs, attachTailoredResumeStatus } = require('../lib/dashboard-routes');
+const { fetchFilteredJobs } = require('../lib/dashboard-routes');
 const { renderJobTable } = require('../lib/html/job-rows');
 
 function createDb() {
@@ -61,13 +61,6 @@ function insertAppliedJob(db, job) {
     job.created_at || job.posted_at,
     job.updated_at || job.applied_at
   );
-}
-
-function insertTailoredResume(db, jobId, status = 'ready') {
-  db.prepare(`
-    INSERT INTO tailored_resumes (job_id, status, resume_pdf_path)
-    VALUES (?, ?, ?)
-  `).run(jobId, status, `/tmp/${jobId}.pdf`);
 }
 
 describe('renderJobTable', () => {
@@ -197,7 +190,7 @@ describe('renderJobTable', () => {
     assert.match(html, /class="job-list filter-rejected"/);
   });
 
-  it('does not show auto-apply badges and exposes manual prep/resume actions only', () => {
+  it('does not show removed apply-prep or resume actions', () => {
     const html = renderJobTable([
       {
         id: 'job-3',
@@ -210,9 +203,6 @@ describe('renderJobTable', () => {
         stage: null,
         score: 8,
         apply_complexity: 'complex',
-        auto_apply_status: 'failed',
-        auto_apply_error: 'Required fields still empty before submit',
-        tailored_resume_status: 'ready',
       },
       {
         id: 'job-4',
@@ -228,11 +218,12 @@ describe('renderJobTable', () => {
       },
     ], {}, {}, 'not-applied', 'score', '', null);
 
-    assert.doesNotMatch(html, /Auto-apply failed/);
     assert.doesNotMatch(html, /autox/);
-    assert.match(html, /Manual Apply Prep/);
-    assert.equal((html.match(/Tailor Resume/g) || []).length, 2);
-    assert.equal((html.match(/View Tailored Resume/g) || []).length, 1);
+    assert.doesNotMatch(html, /Manual Apply Prep/);
+    assert.doesNotMatch(html, /Tailor Resume/);
+    assert.doesNotMatch(html, /View Tailored Resume/);
+    assert.doesNotMatch(html, /Copy Answers/);
+    assert.doesNotMatch(html, /View Apply Image/);
     assert.doesNotMatch(html, /Apply Now/);
     assert.doesNotMatch(html, />simple</);
     assert.doesNotMatch(html, />complex</);
@@ -240,67 +231,6 @@ describe('renderJobTable', () => {
 });
 
 describe('fetchFilteredJobs', () => {
-  it('attaches tailored resume status by default', () => {
-    const db = createDb();
-    insertAppliedJob(db, {
-      id: 'resume-ready',
-      score: 8,
-      posted_at: '2026-04-10',
-      applied_at: '2026-04-29T12:00:00Z',
-    });
-    insertTailoredResume(db, 'resume-ready', 'ready');
-
-    const [job] = fetchFilteredJobs(db, 'applied', 'score');
-
-    assert.equal(job.tailored_resume_status, 'ready');
-    assert.equal(job.tailored_resume_pdf_path, '/tmp/resume-ready.pdf');
-  });
-
-  it('can defer tailored resume status and attach only requested job ids', () => {
-    const db = createDb();
-    for (const job of [
-      { id: 'visible-1', score: 9 },
-      { id: 'visible-2', score: 8 },
-      { id: 'hidden-1', score: 7 },
-    ]) {
-      insertAppliedJob(db, {
-        ...job,
-        posted_at: '2026-04-10',
-        applied_at: '2026-04-29T12:00:00Z',
-      });
-      insertTailoredResume(db, job.id, 'ready');
-    }
-
-    const jobs = fetchFilteredJobs(db, 'applied', 'score', null, { includeTailoredResumeStatus: false });
-    assert.equal(jobs.every((job) => job.tailored_resume_status == null), true);
-
-    let seenSql = '';
-    let seenArgs = [];
-    const trackingDb = {
-      prepare(sql) {
-        if (sql.includes('FROM tailored_resumes')) {
-          seenSql = sql;
-          const statement = db.prepare(sql);
-          return {
-            all(...args) {
-              seenArgs = args;
-              return statement.all(...args);
-            },
-          };
-        }
-        return db.prepare(sql);
-      },
-    };
-
-    const visibleJobs = jobs.slice(0, 2);
-    attachTailoredResumeStatus(trackingDb, visibleJobs);
-
-    assert.deepEqual(seenArgs, ['visible-1', 'visible-2']);
-    assert.match(seenSql.replace(/\s+/g, ' '), /WHERE job_id IN \(\?,\?\)/);
-    assert.equal(visibleJobs.every((job) => job.tailored_resume_status === 'ready'), true);
-    assert.equal(jobs[2].tailored_resume_status, undefined);
-  });
-
   it('sorts applied jobs by the visible posted date when date sort is active', () => {
     const db = createDb();
     insertAppliedJob(db, {

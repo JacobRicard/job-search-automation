@@ -13,8 +13,9 @@ describe('help page', () => {
     assert.match(html, /Which Command To Run/);
     assert.match(html, /npm run daily/);
     assert.match(html, /npm run refresh/);
-    assert.match(html, /npm run apply -- prep --job=&lt;id&gt;/);
+    assert.match(html, /npm run resume/);
     assert.match(html, /--skip-rejection-sync/);
+    assert.doesNotMatch(html, /npm run apply/);
   });
 
   it('documents dashboard views, actions, APIs, and diagnostics', () => {
@@ -23,20 +24,19 @@ describe('help page', () => {
     for (const text of [
       'Dashboard views',
       'Job actions',
-      'Search and filters',
-      'Apply workflow',
+      'Search is case-insensitive',
+      'Apply Tracking',
       'APIs',
       'Diagnostics',
-      'GET  /auto-apply-attempt',
-      'GET  /auto-apply-artifact',
       'GET  /public/*',
       'GET /healthz',
       'GET /metrics',
-      'Manual Apply Prep',
-      'Search is case-insensitive',
-      'Receipt details open through',
+      'pipeline dropdown is the only application-state writer',
     ]) {
       assert.match(html, new RegExp(text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')));
     }
+    assert.doesNotMatch(html, /auto-apply/);
+    assert.doesNotMatch(html, /Manual Apply Prep/);
+    assert.doesNotMatch(html, /Apply Receipts/);
   });
 });

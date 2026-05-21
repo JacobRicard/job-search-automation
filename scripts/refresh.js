@@ -7,7 +7,11 @@ const { spawnSync } = require('child_process');
 const { loadDashboardEnv, loadEnvFile } = require('../lib/env');
 const { formatBuffer } = require('../lib/refresh-logger');
 const { formatLocalTime, formatLocalTimestamp } = require('../lib/time-format');
-const { createRunId } = require('../lib/auto-apply-receipts');
+
+function createRunId(prefix = 'refresh') {
+  const stamp = new Date().toISOString().replace(/[-:.TZ]/g, '').slice(0, 14);
+  return `${prefix}-${stamp}-${Math.random().toString(16).slice(2, 8)}`;
+}
 
 function parseArgs(argv) {
   const flags = new Set(argv.filter((arg) => arg.startsWith('--')));
