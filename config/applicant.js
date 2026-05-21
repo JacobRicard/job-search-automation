@@ -1,6 +1,6 @@
 'use strict';
 
-// Applicant identity used by the auto-applier and application prep prompts.
+// Applicant identity used by profile-aware scripts.
 // All values are read from environment variables. See .env.example for the full list.
 // If a field is empty, downstream code either skips that ATS field or aborts with a clear error.
 

@@ -1,6 +1,6 @@
 # Job Search Pipeline
 
-An end-to-end automation pipeline for a technical job search. Scrapes 11 ATS platforms, scores each listing with an LLM against your resume and context files, generates manual application prep and tailored resumes, and serves a local dashboard for human review and pipeline tracking. IMAP integration syncs rejection emails back into the DB automatically.
+An end-to-end automation pipeline for a technical job search. Scrapes 11 ATS platforms, scores each listing with an LLM against your resume and context files, and serves a local dashboard for manual review and pipeline tracking. IMAP integration syncs rejection emails back into the DB automatically.
 
 Designed for a single applicant (or a small group sharing one machine), not as a SaaS. The point is to get the benefits of a structured pipeline without spinning up infrastructure for it.
 
@@ -62,18 +62,6 @@ Designed for a single applicant (or a small group sharing one machine), not as a
                                    | (server-rendered)    |
                                    +----------+-----------+
                                               |
-                           +------------------+--------------------+
-                           v                                       v
-                 +------------------+                 +---------------------+
-                 | tailored-resume  |                 | application-prep    |
-                 | (per-job MD /    |                 | (manual answers,    |
-                 |  HTML / PDF)     |                 |  bookmarklet, JSON) |
-                 |                  |                 |                     |
-                 +------------------+                 +---------------------+
-                           |                                       |
-                           +-----------------+---------------------+
-                                             |
-                                             v
                                   +----------------------+
                                   |   rejection email    |
                                   |   sync via IMAP      |
@@ -84,8 +72,8 @@ Designed for a single applicant (or a small group sharing one machine), not as a
 
 - **Node.js 18+** (CommonJS), zero build step
 - **better-sqlite3** for per-profile job storage
-- **puppeteer-core + puppeteer-extra-plugin-stealth** for ATS inspection and resume PDF rendering
-- **Google Gemini Flash** for scoring, complexity classification, application prep, and tailored resumes
+- **puppeteer-core** for resume PDF rendering
+- **Google Gemini Flash** for scoring and complexity classification
 - **imapflow** for inbox rejection sync
 - **Server-rendered HTML** dashboard with vanilla client-side JS
 
@@ -101,15 +89,7 @@ Gemini scores each job 1-10 along five dimensions (stack match, seniority, comp,
 
 ### Application complexity classifier
 
-Each scored job is tagged `simple` or `complex` so you can triage apply effort. The active workflow is manual: generate prep, generate a tailored resume, open the job URL, review everything, and submit yourself.
-
-### Tailored resumes
-
-For any job, generate a job-specific resume from the active profile's `resume.md`, optional resume variants, `context.md`, and `career-detail.md`. Artifacts are stored under `JOB_PROFILE_DIR/tailored-resumes/<job-id>/` as Markdown, HTML, PDF, and metadata JSON.
-
-### Voice-aware LLM drafting
-
-All answers generated for applications pass through a voice check (`lib/voice-check.js`) that flags em dashes, corporate buzzwords, and AI-flavored sentence structure. Flagged answers can be rewritten by the LLM with the issues highlighted.
+Each scored job is tagged `simple` or `complex` so you can estimate manual apply effort. No application is submitted or marked applied by automation.
 
 ### Dashboard
 
@@ -122,8 +102,7 @@ Dashboard views:
 - **Applied** — submitted applications that are still active.
 - **Interviewing** — phone screen, interview, onsite, and offer stages.
 - **Rejected / Closed / Ghosted / Archived** — terminal or hidden-state queues.
-- **Stats** — funnel, score calibration, recent events, rejection timing, and apply receipt summaries.
-- **Apply Receipts** — assisted-apply attempt log with status, platform, mode, failure class, score, age, screenshots, and resume artifacts.
+- **Stats** — funnel, score calibration, recent events, and rejection timing.
 - **Event Log** — audit trail from stage, outreach, and archive changes.
 - **Market Research** — aggregate JD analysis against the active profile, including seniority, location, top skills, strategy score, and emerging high-score signals.
 
@@ -131,7 +110,7 @@ Job card actions:
 
 - Change pipeline stage: pending, applied, phone screen, interview, onsite, offer, closed, rejected, or ghosted.
 - Inspect LLM reasoning, saved job description, salary/ATS/company badges, apply screenshots, and company-level tags.
-- Generate manual application prep, copy generated answers, run the bookmarklet payload, and generate or open a tailored resume.
+- Open the source posting, inspect saved job descriptions, and manually move submitted applications to Applied.
 - Toggle outreach tracking and archive jobs without deleting their records.
 
 Search and filters:
@@ -232,19 +211,11 @@ Read routes:
 | `GET /resume` | Streams the active profile resume PDF. `variant=ai` or `variant=devops` streams configured variants. |
 | `GET /company-notes?company=<name>` | Reads normalized company tags and notes. |
 | `GET /job-description?id=<job-id>` | Returns title, company, URL, and saved full JD text. |
-| `GET /job-apply-images?id=<job-id>` | Reports whether pre-apply and post-apply screenshots exist. |
-| `GET /job-apply-image?id=<job-id>&phase=pre\|post` | Streams one apply screenshot. |
-| `GET /job-application-prep?id=<job-id>` | Renders generated manual application prep. |
-| `GET /job-application-data?id=<job-id>` | Returns the application prep JSON payload used by copy actions and bookmarklets. |
-| `GET /job-bookmarklet.js?id=<job-id>` | Returns a job-specific browser autofill script. |
-| `GET /tailored-resume?id=<job-id>&type=pdf\|html\|md` | Streams generated tailored resume artifacts. |
-| `GET /auto-apply-attempt?id=<attempt-id>` | Returns one apply receipt. |
-| `GET /auto-apply-artifact?attemptId=<attempt-id>&type=resume\|pre\|post` | Streams a receipt artifact. |
 | `GET /api/tracker?period=7d\|30d\|90d\|all` | Returns tracker rows for market and activity charts. |
 | `GET /api/insights` | Returns daily digest, activity counts, scraper health, and daily applied chart rows. |
 | `GET /healthz` | SQLite-backed health probe. |
 | `GET /metrics` | Prometheus text metrics. |
-| `GET /public/*` | Static dashboard CSS, JS, and bookmarklet assets. |
+| `GET /public/*` | Static dashboard CSS and JS assets. |
 
 Write routes:
 
@@ -254,22 +225,16 @@ Write routes:
 | `POST /mark-outreach` | Toggles `reached_out_at` for a job. |
 | `POST /archive` | Archives a job without deleting it. |
 | `POST /company-notes` | Saves company tags and notes. |
-| `POST /job-application-prep` | Generates or refreshes application prep for a job. |
-| `POST /tailored-resume` | Generates a tailored resume for a job. |
 | `POST /market-research` | Regenerates market research cache and redirects back to the dashboard view. |
 | `POST /dismiss-slug-banner` | Dismisses the current broken-slug warning banner. |
 
 ## Application workflow in the dashboard
 
-The active workflow keeps final submission under human control:
+The dashboard does not submit applications and does not auto-mark jobs applied:
 
 1. Open a high-score job from **Not Applied** or **All**.
-2. Use **Manual Apply Prep** to generate questions, answers, voice checks, and a job-specific JSON payload.
-3. Use **Tailor Resume** when the application should get a job-specific resume; generated artifacts are stored under the active profile.
-4. Open the job posting and use the bookmarklet or copy modal to fill supported application fields.
-5. Review in the browser, submit manually, then move the dashboard stage to **Applied**.
-
-Apply receipts and screenshots are kept for diagnostics and auditability. They are especially useful for supported ATS flows such as Greenhouse, Lever, and Ashby.
+2. Open the job posting from the title link and apply manually outside the app.
+3. After you submit, move the dashboard stage to **Applied**.
 
 ## Operations and diagnostics
 
@@ -311,8 +276,6 @@ Create a launchd LaunchAgent pointing at `scripts/start-dashboard.sh` with `Keep
 **New ATS platform:** add a `scrapers/<name>.js` module that exports `scrape<Name>()` and returns an array of job objects matching the schema in existing scrapers. Wire it into `scraper.js`.
 
 **New filter tab:** add to `FILTER_DEFS` in `lib/html/helpers.js`, add a corresponding query in `filterQueries` in `lib/dashboard-routes.js`.
-
-**Assisted apply internals:** reviewed browser-fill support for Greenhouse, Lever, and Ashby lives in `lib/ats-appliers/*` behind `lib/auto-applier.js`. The active workflow keeps final submission under human control.
 
 **Scoring calibration:** edit the prompt in `scorer.js`. Deterministic caps live in `scoreJob()`; use those for "never over-score this pattern" rules the LLM keeps rationalizing past.
 
