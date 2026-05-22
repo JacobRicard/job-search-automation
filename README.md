@@ -103,6 +103,29 @@ docker compose up -d --build
 
 Your data lives in `./profiles/` (a local SQLite file plus your resume and context). It survives container restarts and rebuilds.
 
+## Backups
+
+All of your data is one folder: `./profiles/`. Back that folder up however you already back up the rest of your machine.
+
+**Recommended: let your OS do it.** Time Machine (macOS), iCloud Drive, OneDrive, or File History (Windows) will sync `./profiles/` continuously with zero config.
+
+**Local snapshots.** For timestamped archives on the same machine:
+
+```bash
+./scripts/backup.sh                  # writes to ./backups/
+./scripts/backup.sh /path/to/dir     # or any directory you choose
+```
+
+The script uses SQLite's native `.backup` command, so it's safe to run while the worker container is up. To restore, copy the snapshot DB back to `profiles/<name>/jobs.db` (with the container stopped) or untar the `profiles_*.tar.gz` archive.
+
+Daily cron example:
+
+```cron
+0 3 * * * cd /path/to/job-search-automation && ./scripts/backup.sh
+```
+
+No cloud sync is built into this project by design. Your data, your destination.
+
 ## Privacy
 
 All data is local. The only outbound traffic is:

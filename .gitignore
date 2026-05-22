@@ -29,6 +29,9 @@ public/bookmarklet.js
 /profiles/*/
 !/profiles/example/
 
+# Local backups (from scripts/backup.sh)
+/backups/
+
 # Logs
 logs/
 
