@@ -6,15 +6,14 @@ const assert = require('node:assert/strict');
 const { renderHelpPage } = require('../lib/html/help-page');
 
 describe('help page', () => {
-  it('renders the npm command reference from the shared catalog', () => {
+  it('renders the Docker quickstart and free-tier guidance', () => {
     const html = renderHelpPage();
 
-    assert.match(html, /NPM Commands/);
-    assert.match(html, /Which Command To Run/);
-    assert.match(html, /npm run daily/);
-    assert.match(html, /npm run refresh/);
-    assert.match(html, /npm run resume/);
-    assert.match(html, /--skip-rejection-sync/);
+    assert.match(html, /Run It Locally/);
+    assert.match(html, /docker compose up -d/);
+    assert.match(html, /aistudio\.google\.com\/apikey/);
+    assert.match(html, /Free Tier/);
+    assert.doesNotMatch(html, /NPM Commands/);
     assert.doesNotMatch(html, /npm run apply/);
   });
 
