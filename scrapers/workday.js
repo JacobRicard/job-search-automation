@@ -3,28 +3,11 @@
 const { sleep, safeFetch, stripHtml } = require('../lib/utils');
 const { WORKDAY_COMPANIES, SEARCH_TERMS } = require('../config/companies');
 const { matchesSearchTerms } = require('../lib/scraper-utils');
+const { makeJobLead } = require('../lib/job-lead');
 
 // How many companies to query in parallel. Workday is tolerant of concurrent
 // requests but we cap it to avoid hammering shared infra.
 const WORKDAY_CONCURRENCY = 8;
-
-function parseWorkdayDate(dateStr) {
-  if (!dateStr) return null;
-  const today = new Date();
-  const match = dateStr.match(/Posted\s+(\d+)\s+Days?\s+Ago|Posted\s+(Today|Yesterday)/i);
-  if (!match) return dateStr;
-
-  let daysAgo = 0;
-  if (match[1]) {
-    daysAgo = parseInt(match[1], 10);
-  } else if (match[2]) {
-    daysAgo = match[2].toLowerCase() === 'today' ? 0 : 1;
-  }
-
-  const date = new Date(today);
-  date.setDate(date.getDate() - daysAgo);
-  return date.toISOString().split('T')[0];
-}
 
 async function scrapeCompany({ sub, wd, board, label }) {
   const jobs = [];
@@ -66,26 +49,24 @@ async function scrapeCompany({ sub, wd, board, label }) {
       return safeFetch(detailUrl, {}, `workday/${sub}/detail`)
         .then(res => res ? res.json() : null)
         .then(detail => ({
-          job, jobId,
+          job,
           description: stripHtml(detail?.jobPostingInfo?.jobDescription || ''),
         }))
-        .catch(() => ({ job, jobId, description: '' }));
+        .catch(() => ({ job, description: '' }));
     })
   );
 
   for (const r of detailResults) {
     if (r.status !== 'fulfilled') continue;
-    const { job, jobId, description } = r.value;
-    jobs.push({
-      id: jobId,
-      platform: 'Workday',
+    const { job, description } = r.value;
+    jobs.push(makeJobLead({
       title: job.title,
       company: label,
-      url: `${baseUrl}/en-US/${board}${job.externalPath}`,
-      postedAt: parseWorkdayDate(job.postedOn || ''),
+      directApplyUrl: `${baseUrl}/en-US/${board}${job.externalPath}`,
+      atsPlatformName: 'Workday',
+      scrapedTimestamp: new Date().toISOString(),
       description,
-      location: job.locationsText || job.locationName || '',
-    });
+    }));
   }
 
   return jobs;

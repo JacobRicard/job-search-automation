@@ -3,6 +3,7 @@
 const { sleep, safeFetch, stripHtml } = require('../lib/utils');
 const { matchesSearchTerms } = require('../lib/scraper-utils');
 const { SCRAPER_DELAY_MS } = require('../config/constants');
+const { makeJobLead } = require('../lib/job-lead');
 
 // Built In has regional subdomains (e.g. builtinseattle.com, builtinnyc.com, builtinaustin.com).
 // Set BUILTIN_SUBDOMAIN in .env to target a specific region, or leave default for nationwide.
@@ -53,24 +54,6 @@ function parseJobPage(html, pageUrl) {
 
   const org = posting.hiringOrganization || {};
   const salary = posting.baseSalary?.value || {};
-  // jobLocation can be a single object or an array of locations
-  const jobLocations = Array.isArray(posting.jobLocation)
-    ? posting.jobLocation
-    : posting.jobLocation ? [posting.jobLocation] : [];
-
-  // Build location string — join all offices with | so the location filter
-  // checks every location and keeps the job if any one qualifies
-  let locationStr = '';
-  if (posting.jobLocationType === 'TELECOMMUTE') {
-    locationStr = 'Remote';
-  } else if (jobLocations.length > 0) {
-    const locationParts = jobLocations.map((loc) => {
-      const addr = loc.address || {};
-      return [addr.addressLocality, addr.addressRegion].filter(Boolean).join(', ');
-    }).filter(Boolean);
-    locationStr = locationParts.join('|');
-  }
-
   // Build salary string for description context
   let salaryStr = '';
   if (salary.minValue && salary.maxValue) {
@@ -81,21 +64,14 @@ function parseJobPage(html, pageUrl) {
   const initMatch = html.match(/Builtin\.jobPostInit\(\{"job":\{"id":\d+[^}]*"howToApply":"([^"\\]*)"/);
   const applyUrl = initMatch ? initMatch[1].replace(/\\u0026/g, '&') : pageUrl;
 
-  // Extract Built In job ID from URL
-  const idMatch = pageUrl.match(/\/(\d+)$/);
-  const builtinId = idMatch ? idMatch[1] : pageUrl;
-
-  return {
-    id: `builtin-${builtinId}`,
-    platform: 'Built In',
+  return makeJobLead({
     title: posting.title || '',
     company: org.name || '',
-    url: applyUrl || pageUrl,
-    builtinUrl: pageUrl,
-    postedAt: posting.datePosted || new Date().toISOString(),
+    directApplyUrl: applyUrl || pageUrl,
+    atsPlatformName: 'Built In',
+    scrapedTimestamp: new Date().toISOString(),
     description: `${salaryStr ? salaryStr + ' | ' : ''}${stripHtml(posting.description || '')}`,
-    location: locationStr,
-  };
+  });
 }
 
 async function scrapeBuiltin() {

@@ -71,6 +71,7 @@ Designed for a single applicant (or a small group sharing one machine), not as a
 ## Tech stack
 
 - **Node.js 18+** (CommonJS), zero build step
+- **Python 3.10+ / Pydantic 2** for the strict scraper `JobLead` contract
 - **better-sqlite3** for per-profile job storage
 - **puppeteer-core** for resume PDF rendering
 - **Google Gemini Flash** for scoring and complexity classification
@@ -109,7 +110,7 @@ Dashboard views:
 Job card actions:
 
 - Change pipeline stage: pending, applied, phone screen, interview, onsite, offer, closed, rejected, or ghosted.
-- Inspect LLM reasoning, saved job description, salary/ATS/company badges, apply screenshots, and company-level tags.
+- Inspect LLM reasoning, saved job description, salary/ATS/company badges, and company-level tags.
 - Open the source posting, inspect saved job descriptions, and manually move submitted applications to Applied.
 - Toggle outreach tracking and archive jobs without deleting their records.
 
@@ -149,12 +150,14 @@ cd job-search-automation
 
 # 1. Dependencies (Node 18+ required, see `.nvmrc` if using nvm)
 npm install
+python3 -m venv .venv
+. .venv/bin/activate
+python -m pip install -r requirements.txt
 
 # 2. Config
 cp .env.example .env
 # then fill in:
 #   - GEMINI_API_KEY (https://aistudio.google.com/apikey)
-#   - APPLICANT_* fields for your identity
 #   - GMAIL_EMAIL / GMAIL_APP_PASSWORD (optional; for rejection sync)
 
 # 3. Profile scaffolding
@@ -194,8 +197,8 @@ The seed script populates 20 fake jobs, pipeline stages, and a pre-computed mark
 
 ```bash
 npm run help               # command reference with use cases and flags
-npm run help -- apply      # filter commands by group, command, flag, or text
 npm run help -- --json     # machine-readable command reference
+npm run test:contracts     # Pydantic JobLead contract tests
 ```
 
 ## Dashboard route reference
@@ -273,7 +276,7 @@ Create a launchd LaunchAgent pointing at `scripts/start-dashboard.sh` with `Keep
 
 ## Extending
 
-**New ATS platform:** add a `scrapers/<name>.js` module that exports `scrape<Name>()` and returns an array of job objects matching the schema in existing scrapers. Wire it into `scraper.js`.
+**New ATS platform:** add a `scrapers/<name>.js` module that exports `scrape<Name>()` and returns strict `JobLead` objects with exactly `title`, `company`, `description`, `direct_apply_url`, `ats_platform_name`, and `scraped_timestamp`. Wire it into `scraper.js`; the Pydantic contract rejects extra or malformed fields.
 
 **New filter tab:** add to `FILTER_DEFS` in `lib/html/helpers.js`, add a corresponding query in `filterQueries` in `lib/dashboard-routes.js`.
 

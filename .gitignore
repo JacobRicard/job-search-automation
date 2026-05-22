@@ -8,6 +8,10 @@
 # Node
 node_modules/
 
+# Python
+.venv/
+__pycache__/
+
 # SQLite
 jobs.db
 *.db-shm

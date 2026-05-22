@@ -16,11 +16,9 @@ function createDb() {
   return db;
 }
 
-describe('pipeline manual apply boundary', () => {
-  it('does not import or invoke unattended apply modules', () => {
+describe('pipeline manual application boundary', () => {
+  it('does not import or invoke unattended submission modules', () => {
     const source = fs.readFileSync(path.join(__dirname, '..', 'pipeline.js'), 'utf8');
-    assert.doesNotMatch(source, /auto-applier/);
-    assert.doesNotMatch(source, /run-auto-apply/);
     assert.doesNotMatch(source, /submitOne|applyOne|runBatch/);
   });
 

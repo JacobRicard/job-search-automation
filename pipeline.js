@@ -25,6 +25,7 @@ const { callGemini, MODEL } = require('./lib/gemini');
 const { GEMINI_DAILY_LIMIT } = require('./config/constants');
 const { classifyComplexity } = require('./lib/complexity');
 const { isPrimaryPlatform } = require('./lib/ats-resolver');
+const { jobLeadToInternal, validateWithPydantic } = require('./lib/job-lead');
 const { normalizeScrapedJobs } = require('./scripts/resolve-ats-aliases');
 const { getHistoricalStageStats } = require('./lib/stage-stats');
 const logPaths = require('./lib/log-paths');
@@ -90,7 +91,8 @@ Strong fits (8+/10): ${highScored.length > 0 ? highScored.map(j => `${j.company}
 
 async function run() {
   requireEnv('GEMINI_API_KEY');
-  const scrapedRaw = JSON.parse(fs.readFileSync(jobsJsonPath, 'utf8'));
+  const scrapedLeads = validateWithPydantic(JSON.parse(fs.readFileSync(jobsJsonPath, 'utf8')));
+  const scrapedRaw = scrapedLeads.map(jobLeadToInternal);
 
   const db = getDb();
   // Skip ATS resolution for alternate-platform jobs already in the DB (title+company match).

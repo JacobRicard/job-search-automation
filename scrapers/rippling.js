@@ -4,6 +4,7 @@ const { sleep, safeFetch, stripHtml } = require('../lib/utils');
 const { RIPPLING_COMPANIES } = require('../config/companies');
 const { matchesSearchTerms } = require('../lib/scraper-utils');
 const { MAX_DESCRIPTION_LENGTH } = require('../config/constants');
+const { makeJobLead } = require('../lib/job-lead');
 
 function parseNextData(html) {
   const match = html.match(/<script id="__NEXT_DATA__" type="application\/json">([\s\S]*?)<\/script>/);
@@ -66,18 +67,14 @@ async function scrapeRippling() {
         : '';
       const description = stripHtml(rawDesc).slice(0, MAX_DESCRIPTION_LENGTH);
 
-      const location = item.locations?.[0]?.name || detail?.workLocations?.[0] || '';
-
-      jobs.push({
-        id: `rippling-${slug}-${item.id}`,
-        platform: 'Rippling',
+      jobs.push(makeJobLead({
         title: item.name,
         company: detail?.companyName || slug,
-        url: item.url || `https://ats.rippling.com/${slug}/jobs/${item.id}`,
-        postedAt: detail?.createdOn || null,
+        directApplyUrl: item.url || `https://ats.rippling.com/${slug}/jobs/${item.id}`,
+        atsPlatformName: 'Rippling',
+        scrapedTimestamp: new Date().toISOString(),
         description,
-        location,
-      });
+      }));
     }
   }
 

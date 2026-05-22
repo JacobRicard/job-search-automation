@@ -2,6 +2,7 @@
 
 const { stripHtml, safeFetch } = require('../lib/utils');
 const { matchesSearchTerms } = require('../lib/scraper-utils');
+const { makeJobLead } = require('../lib/job-lead');
 
 // Replaces the defunct Wellfound scraper.
 // Remotive has server-side category filtering; we fetch system-admin and backend-dev
@@ -25,16 +26,14 @@ async function scrapeWellfound() {
       if (seen.has(job.id)) continue;
       seen.add(job.id);
 
-      jobs.push({
-        id: `remotive-${job.id}`,
-        platform: 'Remotive',
+      jobs.push(makeJobLead({
         title,
         company: job.company_name || '',
-        url: job.url || '',
-        postedAt: job.publication_date || new Date().toISOString(),
+        directApplyUrl: job.url || '',
+        atsPlatformName: 'Remotive',
+        scrapedTimestamp: new Date().toISOString(),
         description: stripHtml(job.description || ''),
-        location: job.candidate_required_location || 'Remote',
-      });
+      }));
     }
   }
 

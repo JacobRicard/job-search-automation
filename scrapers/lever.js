@@ -3,6 +3,7 @@
 const { scrapeCompanies } = require('../lib/base-scraper');
 const { LEVER_COMPANIES } = require('../config/companies');
 const { stripHtml } = require('../lib/utils');
+const { makeJobLead } = require('../lib/job-lead');
 
 async function scrapeLever() {
   return scrapeCompanies({
@@ -19,16 +20,14 @@ async function scrapeLever() {
         if (section.content) parts.push(stripHtml(section.content));
       }
       if (job.closing) parts.push(stripHtml(job.closing));
-      return {
-        id: `lever-${job.id}`,
-        platform: 'Lever',
+      return makeJobLead({
         title: job.text,
         company: company,
-        url: job.hostedUrl,
-        postedAt: new Date(job.createdAt).toISOString(),
+        directApplyUrl: job.hostedUrl,
+        atsPlatformName: 'Lever',
+        scrapedTimestamp: new Date().toISOString(),
         description: parts.filter(Boolean).join('\n\n'),
-        location: (job.categories?.location) || '',
-      };
+      });
     },
   });
 }

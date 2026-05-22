@@ -4,6 +4,7 @@ const { sleep, safeFetch, stripHtml } = require('../lib/utils');
 const { MAX_DESCRIPTION_LENGTH } = require('../config/constants');
 const { matchesSearchTerms } = require('../lib/scraper-utils');
 const { SCRAPER_DELAY_RSS_MS } = require('../config/constants');
+const { makeJobLead } = require('../lib/job-lead');
 
 /**
  * Extract text content from an XML tag, handling both CDATA and plain text.
@@ -46,16 +47,14 @@ async function scrapeWWR() {
 
       if (!matchesSearchTerms(jobTitle)) continue;
 
-      jobs.push({
-        id: `wwr-${Buffer.from(link).toString('base64').slice(0, 16)}`,
-        platform: 'WeWorkRemotely',
+      jobs.push(makeJobLead({
         title: jobTitle,
         company,
-        url: link,
-        postedAt: pubDate ? new Date(pubDate).toISOString() : new Date().toISOString(),
+        directApplyUrl: link,
+        atsPlatformName: 'WeWorkRemotely',
+        scrapedTimestamp: new Date().toISOString(),
         description: stripHtml(desc).slice(0, MAX_DESCRIPTION_LENGTH),
-        location: 'Remote',
-      });
+      }));
     }
 
     await sleep(SCRAPER_DELAY_RSS_MS);

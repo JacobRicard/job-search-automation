@@ -202,18 +202,16 @@ describe('wwr extractTag', () => {
 // ---------------------------------------------------------------------------
 
 describe('job object shape', () => {
-  const REQUIRED_FIELDS = ['id', 'platform', 'title', 'company', 'url', 'postedAt', 'description', 'location'];
+  const REQUIRED_FIELDS = ['title', 'company', 'description', 'direct_apply_url', 'ats_platform_name', 'scraped_timestamp'];
 
   it('validates a well-formed job object', () => {
     const job = {
-      id: 'greenhouse-123',
-      platform: 'Greenhouse',
       title: 'DevOps Engineer',
       company: 'acme',
-      url: 'https://example.com/job/123',
-      postedAt: '2026-03-15T00:00:00Z',
       description: 'Build infrastructure',
-      location: 'Remote',
+      direct_apply_url: 'https://example.com/job/123',
+      ats_platform_name: 'Greenhouse',
+      scraped_timestamp: '2026-03-15T00:00:00Z',
     };
     for (const field of REQUIRED_FIELDS) {
       assert.ok(field in job, `missing field: ${field}`);

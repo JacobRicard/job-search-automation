@@ -30,10 +30,18 @@ describe('Workable public endpoints', () => {
     }, 'acme');
 
     assert.equal(jobs.length, 1);
-    assert.equal(jobs[0].id, 'workable-acme-ABC123');
+    assert.deepEqual(Object.keys(jobs[0]).sort(), [
+      'ats_platform_name',
+      'company',
+      'description',
+      'direct_apply_url',
+      'scraped_timestamp',
+      'title',
+    ].sort());
+    assert.equal(jobs[0].ats_platform_name, 'Workable');
+    assert.equal(jobs[0].direct_apply_url, 'https://apply.workable.com/acme/j/ABC123');
     assert.equal(jobs[0].company, 'Acme');
     assert.equal(jobs[0].description, 'Keep systems reliable.');
-    assert.equal(jobs[0].location, 'Remote, United States');
   });
 
   it('normalizes widget endpoint jobs nested below account data', () => {
@@ -53,8 +61,7 @@ describe('Workable public endpoints', () => {
     }, 'widgetco');
 
     assert.equal(jobs.length, 1);
-    assert.equal(jobs[0].id, 'workable-widgetco-XYZ789');
-    assert.equal(jobs[0].url, 'https://apply.workable.com/j/XYZ789');
+    assert.equal(jobs[0].direct_apply_url, 'https://apply.workable.com/j/XYZ789');
     assert.equal(jobs[0].company, 'Widget Co');
   });
 
