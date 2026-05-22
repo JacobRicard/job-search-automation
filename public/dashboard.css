@@ -449,7 +449,10 @@ header {
 }
 
 .loc-clear-btn {
-  padding: 5px 12px;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 5px 10px;
   border-radius: 6px;
   border: 0.5px solid var(--border);
   background: transparent;
@@ -465,6 +468,15 @@ header {
   background: rgba(168, 85, 247, 0.08);
   border-color: rgba(168, 85, 247, 0.4);
   color: var(--text-primary);
+}
+
+.loc-clear-btn svg { flex-shrink: 0; opacity: 0.8; }
+
+.loc-hint {
+  font-size: 10px;
+  color: var(--text-faint);
+  padding: 6px 10px 2px;
+  font-style: italic;
 }
 
 .location-hidden-banner {

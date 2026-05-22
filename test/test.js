@@ -184,8 +184,8 @@ describe('isLocationAllowed', () => {
 });
 
 describe('passesPrefs (metro-aware)', () => {
-  const seattlePrefs = { metros: ['seattle'], remote: true, includeUnknown: true };
-  const seattleStrict = { metros: ['seattle'], remote: false, includeUnknown: false };
+  const seattlePrefs = { metros: ['seattle'], includeUnknown: true };
+  const seattleStrict = { metros: ['seattle'], includeUnknown: false };
 
   it('matches cities within the chosen metro', () => {
     assert.ok(passesPrefs('Redmond, WA', seattlePrefs, metros));
@@ -202,9 +202,10 @@ describe('passesPrefs (metro-aware)', () => {
     assert.equal(passesPrefs('San Francisco, CA, United States', seattlePrefs, metros), false);
   });
 
-  it('honors the remote toggle', () => {
+  it('always includes remote jobs when a metro is selected', () => {
     assert.ok(passesPrefs('Remote', seattlePrefs, metros));
-    assert.equal(passesPrefs('Remote', seattleStrict, metros), false);
+    assert.ok(passesPrefs('Remote', seattleStrict, metros));
+    assert.ok(passesPrefs('Work from home', seattleStrict, metros));
   });
 
   it('honors the includeUnknown toggle', () => {
@@ -213,7 +214,7 @@ describe('passesPrefs (metro-aware)', () => {
   });
 
   it('passes everything when no metros and toggles default-on', () => {
-    const open = { metros: [], remote: true, includeUnknown: true };
+    const open = { metros: [], includeUnknown: true };
     assert.ok(passesPrefs('San Francisco, CA', open, metros));
     assert.ok(passesPrefs('', open, metros));
   });
