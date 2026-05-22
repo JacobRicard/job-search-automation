@@ -208,6 +208,20 @@ describe('passesPrefs (metro-aware)', () => {
     assert.ok(passesPrefs('Work from home', seattleStrict, metros));
   });
 
+  it('uses title text to catch multi-location postings stored under one city', () => {
+    // Real case: location field is "NY" but title says "(Remote or NYC - Hybrid)"
+    const job = { location: 'NY', title: 'Senior SRE (Remote or NYC - Hybrid)' };
+    assert.ok(passesPrefs(job, seattlePrefs, metros));
+
+    // Title mentions Seattle even though stored location is elsewhere
+    const seattleTitle = { location: 'Austin, TX', title: 'Platform Engineer - Seattle' };
+    assert.ok(passesPrefs(seattleTitle, seattlePrefs, metros));
+
+    // No title signals and out-of-metro location: still excluded
+    const austin = { location: 'Austin, TX', title: 'Platform Engineer' };
+    assert.equal(passesPrefs(austin, seattlePrefs, metros), false);
+  });
+
   it('honors the includeUnknown toggle', () => {
     assert.ok(passesPrefs('', seattlePrefs, metros));
     assert.equal(passesPrefs('', seattleStrict, metros), false);
