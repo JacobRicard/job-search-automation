@@ -18,6 +18,7 @@ const logPaths = require('./lib/log-paths');
 const log = require('./lib/logger')('scraper', { logFile: logPaths.daily('scraper') });
 const { validateJobs } = require('./lib/validate');
 const { deriveJobId, validateWithPydantic } = require('./lib/job-lead');
+const { scraperRunsTotal } = require('./lib/metrics');
 const { scrapeGreenhouse } = require('./scrapers/greenhouse');
 const { scrapeLever }      = require('./scrapers/lever');
 const { scrapeWorkable }   = require('./scrapers/workable');
@@ -51,8 +52,18 @@ function timed(label, fn) {
     setTimeout(() => reject(new Error(`timeout after ${SCRAPER_TIMEOUT_MS / 1000}s`)), SCRAPER_TIMEOUT_MS)
   );
   return Promise.race([fn(), timeout]).then(
-    (v) => { platformLog.info('Scraper done', { ms: Date.now() - start }); return v; },
-    (e) => { platformLog.warn('Scraper timed out or failed', { ms: Date.now() - start, error: e.message }); return []; }
+    (v) => {
+      scraperRunsTotal.inc({ platform: label, outcome: 'success' });
+      platformLog.info('Scraper done', { ms: Date.now() - start });
+      return v;
+    },
+    (e) => {
+      const ms = Date.now() - start;
+      scraperRunsTotal.inc({ platform: label, outcome: 'failure' });
+      platformLog.warn('Scraper timed out or failed', { ms, error: e.message });
+      process.stdout.write(JSON.stringify({ level: 'error', platform: label, error: e.message, ms }) + '\n');
+      return [];
+    }
   );
 }
 
