@@ -184,8 +184,7 @@ describe('isLocationAllowed', () => {
 });
 
 describe('passesPrefs (metro-aware)', () => {
-  const seattlePrefs = { metros: ['seattle'], includeUnknown: true };
-  const seattleStrict = { metros: ['seattle'], includeUnknown: false };
+  const seattlePrefs = { metros: ['seattle'] };
 
   it('matches cities within the chosen metro', () => {
     assert.ok(passesPrefs('Redmond, WA', seattlePrefs, metros));
@@ -204,8 +203,7 @@ describe('passesPrefs (metro-aware)', () => {
 
   it('always includes remote jobs when a metro is selected', () => {
     assert.ok(passesPrefs('Remote', seattlePrefs, metros));
-    assert.ok(passesPrefs('Remote', seattleStrict, metros));
-    assert.ok(passesPrefs('Work from home', seattleStrict, metros));
+    assert.ok(passesPrefs('Work from home', seattlePrefs, metros));
   });
 
   it('uses title text to catch multi-location postings stored under one city', () => {
@@ -222,13 +220,20 @@ describe('passesPrefs (metro-aware)', () => {
     assert.equal(passesPrefs(austin, seattlePrefs, metros), false);
   });
 
-  it('honors the includeUnknown toggle', () => {
+  it('always includes blank-location jobs (could be in the metro)', () => {
     assert.ok(passesPrefs('', seattlePrefs, metros));
-    assert.equal(passesPrefs('', seattleStrict, metros), false);
+    assert.ok(passesPrefs(null, seattlePrefs, metros));
   });
 
-  it('passes everything when no metros and toggles default-on', () => {
-    const open = { metros: [], includeUnknown: true };
+  it('includes nationwide US postings ("United States" alone)', () => {
+    assert.ok(passesPrefs('United States', seattlePrefs, metros));
+    assert.ok(passesPrefs('USA', seattlePrefs, metros));
+    // But a specific US city still gets metro-checked
+    assert.equal(passesPrefs('Austin, TX, United States', seattlePrefs, metros), false);
+  });
+
+  it('passes everything when no metros are selected', () => {
+    const open = { metros: [] };
     assert.ok(passesPrefs('San Francisco, CA', open, metros));
     assert.ok(passesPrefs('', open, metros));
   });

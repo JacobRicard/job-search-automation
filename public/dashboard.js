@@ -52,8 +52,7 @@ function readLocationPrefsFromPanel() {
   if (!panel) return null;
   const metros = [...panel.querySelectorAll('input[data-metro]:checked')]
     .map((el) => el.getAttribute('data-metro'));
-  const includeUnknown = document.getElementById('loc-unknown')?.checked !== false;
-  return { metros, includeUnknown };
+  return { metros };
 }
 
 function onLocationChange() {
@@ -73,7 +72,7 @@ function clearLocationPrefs() {
   fetch('/api/location-prefs', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ metros: [], includeUnknown: true }),
+    body: JSON.stringify({ metros: [] }),
   }).then(() => window.location.reload());
 }
 
