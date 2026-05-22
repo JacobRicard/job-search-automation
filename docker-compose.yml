@@ -1,0 +1,32 @@
+services:
+  dashboard:
+    build: .
+    ports:
+      - "${DASHBOARD_PORT:-3131}:${DASHBOARD_PORT:-3131}"
+    volumes:
+      - ./profiles:/app/profiles
+    env_file: .env
+    restart: unless-stopped
+    healthcheck:
+      test:
+        - CMD
+        - node
+        - -e
+        - |
+          const port = process.env.DASHBOARD_PORT || 3131;
+          require('http').get('http://localhost:' + port + '/healthz', r => process.exit(r.statusCode === 200 ? 0 : 1)).on('error', () => process.exit(1));
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+
+  worker:
+    build: .
+    volumes:
+      - ./profiles:/app/profiles
+    env_file: .env
+    depends_on:
+      dashboard:
+        condition: service_healthy
+    command: ["/bin/sh", "scripts/docker-worker.sh"]
+    restart: unless-stopped

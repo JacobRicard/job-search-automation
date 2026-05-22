@@ -1,0 +1,12 @@
+.git
+node_modules
+logs/
+.env
+.context/
+profiles/*/jobs.db
+profiles/*/jobs.json
+profiles/*/market-research-cache.json
+profiles/*/slug-health.json
+profiles/*/slug-health-dismissed.json
+profiles/*/jd-health.json
+profiles/*/suggested-companies.json
