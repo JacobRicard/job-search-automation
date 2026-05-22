@@ -35,6 +35,7 @@ describe('Workable public endpoints', () => {
       'company',
       'description',
       'direct_apply_url',
+      'location',
       'scraped_timestamp',
       'title',
     ].sort());

@@ -54,6 +54,17 @@ function parseJobPage(html, pageUrl) {
 
   const org = posting.hiringOrganization || {};
   const salary = posting.baseSalary?.value || {};
+  const jobLocations = Array.isArray(posting.jobLocation)
+    ? posting.jobLocation
+    : (posting.jobLocation ? [posting.jobLocation] : []);
+  const locParts = jobLocations.map((loc) => {
+    const addr = loc?.address || {};
+    return [addr.addressLocality, addr.addressRegion].filter(Boolean).join(', ');
+  }).filter(Boolean);
+  const isTelecommute = posting.jobLocationType === 'TELECOMMUTE';
+  const location = locParts.length
+    ? locParts.join(' | ')
+    : (isTelecommute ? 'Remote' : '');
   // Build salary string for description context
   let salaryStr = '';
   if (salary.minValue && salary.maxValue) {
@@ -71,6 +82,7 @@ function parseJobPage(html, pageUrl) {
     atsPlatformName: 'Built In',
     scrapedTimestamp: new Date().toISOString(),
     description: `${salaryStr ? salaryStr + ' | ' : ''}${stripHtml(posting.description || '')}`,
+    location,
   });
 }
 

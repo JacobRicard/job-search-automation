@@ -36,6 +36,7 @@ const {
   handleDismissSlugBanner,
   handleTrackerApi,
   handleInsightsApi,
+  handleLocationPrefsApi,
 } = require('./lib/dashboard-routes');
 
 const PORT = DASHBOARD_PORT;
@@ -78,6 +79,8 @@ const routes = {
   'POST /dismiss-slug-banner': handleDismissSlugBanner,
   'GET /api/tracker':        handleTrackerApi,
   'GET /api/insights':       handleInsightsApi,
+  'GET /api/location-prefs': handleLocationPrefsApi,
+  'POST /api/location-prefs': handleLocationPrefsApi,
   'GET /help':               handleHelpPage,
   'GET /':                   handleDashboardPage,
 };

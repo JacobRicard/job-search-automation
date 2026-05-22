@@ -20,6 +20,10 @@ async function scrapeAshby() {
         || '';
       const description = (salarySummary ? `Compensation: ${salarySummary}\n\n${baseDesc}` : baseDesc)
         .slice(0, MAX_DESCRIPTION_LENGTH);
+      const secondary = Array.isArray(job.secondaryLocations)
+        ? job.secondaryLocations.map((l) => l?.location || l?.locationName).filter(Boolean)
+        : [];
+      const location = [job.locationName, ...secondary].filter(Boolean).join(' | ');
       return makeJobLead({
         title: job.title,
         company: job.companyName || company,
@@ -27,6 +31,7 @@ async function scrapeAshby() {
         atsPlatformName: 'Ashby',
         scrapedTimestamp: new Date().toISOString(),
         description,
+        location,
       });
     },
   });

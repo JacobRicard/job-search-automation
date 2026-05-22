@@ -37,28 +37,35 @@ async function scrapeCompany({ sub, wd, board, label }) {
       if (seen.has(jobId)) continue;
       if (!matchesSearchTerms(job.title)) continue;
       seen.add(jobId);
-      detailFetches.push({ job, jobId });
+      const listLocation = job.locationsText || (Array.isArray(job.bulletFields) ? job.bulletFields[0] : '') || '';
+      detailFetches.push({ job, jobId, listLocation });
     }
   }
 
   // Fetch descriptions in parallel
   const detailResults = await Promise.allSettled(
-    detailFetches.map(({ job, jobId }) => {
-      if (!job.externalPath) return Promise.resolve({ job, jobId, description: '' });
+    detailFetches.map(({ job, jobId, listLocation }) => {
+      if (!job.externalPath) return Promise.resolve({ job, jobId, description: '', location: listLocation });
       const detailUrl = `${baseUrl}/wday/cxs/${sub}/${board}${job.externalPath}`;
       return safeFetch(detailUrl, {}, `workday/${sub}/detail`)
         .then(res => res ? res.json() : null)
-        .then(detail => ({
-          job,
-          description: stripHtml(detail?.jobPostingInfo?.jobDescription || ''),
-        }))
-        .catch(() => ({ job, description: '' }));
+        .then(detail => {
+          const info = detail?.jobPostingInfo || {};
+          const extra = Array.isArray(info.additionalLocations) ? info.additionalLocations.filter(Boolean) : [];
+          const location = [info.location, ...extra].filter(Boolean).join(' | ') || listLocation || '';
+          return {
+            job,
+            description: stripHtml(info.jobDescription || ''),
+            location,
+          };
+        })
+        .catch(() => ({ job, description: '', location: listLocation || '' }));
     })
   );
 
   for (const r of detailResults) {
     if (r.status !== 'fulfilled') continue;
-    const { job, description } = r.value;
+    const { job, description, location } = r.value;
     jobs.push(makeJobLead({
       title: job.title,
       company: label,
@@ -66,6 +73,7 @@ async function scrapeCompany({ sub, wd, board, label }) {
       atsPlatformName: 'Workday',
       scrapedTimestamp: new Date().toISOString(),
       description,
+      location,
     }));
   }
 

@@ -22,6 +22,10 @@ async function scrapeArbeitnow() {
     const jobUrl = job.url || '';
     const ats = detectAts(jobUrl);
 
+    const rawLoc = Array.isArray(job.location)
+      ? job.location.filter(Boolean).join(', ')
+      : (job.location || '');
+    const location = rawLoc || (job.remote ? 'Remote' : '');
     jobs.push(makeJobLead({
       title,
       company: job.company_name || '',
@@ -29,6 +33,7 @@ async function scrapeArbeitnow() {
       atsPlatformName: ats ? ats.platform : 'Arbeitnow',
       scrapedTimestamp: new Date().toISOString(),
       description: stripHtml(job.description || ''),
+      location,
     }));
   }
 

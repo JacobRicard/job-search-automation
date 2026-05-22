@@ -16,11 +16,17 @@ const lead = {
 };
 
 describe('JobLead contract helpers', () => {
-  it('validates the strict six-field JobLead shape', () => {
+  it('validates the JobLead shape', () => {
     assert.deepEqual(validateJob(lead), {
       ...lead,
       direct_apply_url: 'https://job-boards.greenhouse.io/acme/jobs/12345?gh_src=test#section',
+      location: '',
     });
+  });
+
+  it('preserves a location field when present', () => {
+    const out = validateJob({ ...lead, location: 'Seattle, WA' });
+    assert.equal(out.location, 'Seattle, WA');
   });
 
   it('rejects extra scraper fields', () => {

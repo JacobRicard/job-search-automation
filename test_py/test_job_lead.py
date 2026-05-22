@@ -38,6 +38,14 @@ class JobLeadContractTest(unittest.TestCase):
         with self.assertRaises(ValidationError):
             JobLead.model_validate({**VALID, "scraped_timestamp": "yesterday"})
 
+    def test_location_defaults_to_blank(self):
+        lead = JobLead.model_validate(VALID)
+        self.assertEqual(lead.location, "")
+
+    def test_accepts_location(self):
+        lead = JobLead.model_validate({**VALID, "location": "Seattle, WA"})
+        self.assertEqual(lead.location, "Seattle, WA")
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -12,14 +12,21 @@ async function scrapeGreenhouse() {
     buildUrl: (company) => `https://boards-api.greenhouse.io/v1/boards/${company}/jobs?content=true`,
     parseResponse: (data) => data.jobs || [],
     matchField: (job) => job.title,
-    mapJob: (job, company) => makeJobLead({
-      title: job.title,
-      company: company,
-      directApplyUrl: job.absolute_url,
-      atsPlatformName: 'Greenhouse',
-      scrapedTimestamp: new Date().toISOString(),
-      description: stripHtml(job.content || ''),
-    }),
+    mapJob: (job, company) => {
+      const offices = Array.isArray(job.offices)
+        ? job.offices.map((o) => o?.name).filter(Boolean).join(' | ')
+        : '';
+      const location = job.location?.name || offices || '';
+      return makeJobLead({
+        title: job.title,
+        company: company,
+        directApplyUrl: job.absolute_url,
+        atsPlatformName: 'Greenhouse',
+        scrapedTimestamp: new Date().toISOString(),
+        description: stripHtml(job.content || ''),
+        location,
+      });
+    },
   });
 }
 

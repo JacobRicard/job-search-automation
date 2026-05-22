@@ -47,6 +47,7 @@ async function scrapeWWR() {
 
       if (!matchesSearchTerms(jobTitle)) continue;
 
+      const region = extractTag(item, 'region');
       jobs.push(makeJobLead({
         title: jobTitle,
         company,
@@ -54,6 +55,7 @@ async function scrapeWWR() {
         atsPlatformName: 'WeWorkRemotely',
         scrapedTimestamp: new Date().toISOString(),
         description: stripHtml(desc).slice(0, MAX_DESCRIPTION_LENGTH),
+        location: region || 'Remote',
       }));
     }
 

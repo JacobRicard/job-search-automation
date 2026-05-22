@@ -34,6 +34,7 @@ async function scrapeRemoteOK() {
       atsPlatformName: ats ? ats.platform : 'RemoteOK',
       scrapedTimestamp: new Date().toISOString(),
       description: stripHtml(job.description || ''),
+      location: job.location || 'Remote',
     }));
   }
 

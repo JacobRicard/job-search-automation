@@ -67,6 +67,24 @@ async function scrapeRippling() {
         : '';
       const description = stripHtml(rawDesc).slice(0, MAX_DESCRIPTION_LENGTH);
 
+      const rawLocs = [
+        ...(Array.isArray(item.locations) ? item.locations : []),
+        ...(Array.isArray(detail?.locations) ? detail.locations : []),
+      ]
+        .map((l) => (typeof l === 'string' ? l : (l?.name || l?.city || '')))
+        .filter(Boolean);
+      const seenLoc = new Set();
+      const dedupedLocs = rawLocs.filter((l) => {
+        const key = l.toLowerCase();
+        if (seenLoc.has(key)) return false;
+        seenLoc.add(key);
+        return true;
+      });
+      const isRemoteJob = item.workplaceType === 'remote' || detail?.workplaceType === 'remote';
+      const location = dedupedLocs.length
+        ? dedupedLocs.join(' | ')
+        : (isRemoteJob ? 'Remote' : '');
+
       jobs.push(makeJobLead({
         title: item.name,
         company: detail?.companyName || slug,
@@ -74,6 +92,7 @@ async function scrapeRippling() {
         atsPlatformName: 'Rippling',
         scrapedTimestamp: new Date().toISOString(),
         description,
+        location,
       }));
     }
   }

@@ -28,6 +28,7 @@ async function scrapeJobicy() {
       atsPlatformName: ats ? ats.platform : 'Remotive',
       scrapedTimestamp: new Date().toISOString(),
       description: stripHtml(job.description || ''),
+      location: job.candidate_required_location || 'Remote',
     }));
   }
 

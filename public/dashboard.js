@@ -29,7 +29,53 @@ function toggleFilterPanel() {
   if (isOpen) {
     document.getElementById('nav-menu')?.classList.remove('open');
     document.getElementById('nav-menu-btn')?.classList.remove('active');
+    document.getElementById('location-panel')?.classList.remove('open');
   }
+}
+
+// ── Location popover ─────────────────────────────────────────────────
+let _locationSaveTimer = null;
+function toggleLocationPanel() {
+  const panel = document.getElementById('location-panel');
+  const btn = document.getElementById('location-panel-btn');
+  if (!panel) return;
+  const isOpen = panel.classList.toggle('open');
+  if (btn) btn.classList.toggle('active', isOpen);
+  if (isOpen) {
+    document.getElementById('nav-menu')?.classList.remove('open');
+    document.getElementById('filter-panel')?.classList.remove('open');
+  }
+}
+
+function readLocationPrefsFromPanel() {
+  const panel = document.getElementById('location-panel');
+  if (!panel) return null;
+  const metros = [...panel.querySelectorAll('input[data-metro]:checked')]
+    .map((el) => el.getAttribute('data-metro'));
+  const remote = document.getElementById('loc-remote')?.checked !== false;
+  const includeUnknown = document.getElementById('loc-unknown')?.checked !== false;
+  return { metros, remote, includeUnknown };
+}
+
+function onLocationChange() {
+  clearTimeout(_locationSaveTimer);
+  _locationSaveTimer = setTimeout(() => {
+    const prefs = readLocationPrefsFromPanel();
+    if (!prefs) return;
+    fetch('/api/location-prefs', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(prefs),
+    }).then(() => window.location.reload());
+  }, 250);
+}
+
+function clearLocationPrefs() {
+  fetch('/api/location-prefs', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ metros: [], remote: true, includeUnknown: true }),
+  }).then(() => window.location.reload());
 }
 
 // ── Job action menus ─────────────────────────────────────────────────

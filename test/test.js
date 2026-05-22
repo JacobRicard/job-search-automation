@@ -160,7 +160,8 @@ describe('score parsing', () => {
 // Location filter
 // ---------------------------------------------------------------------------
 
-const { isLocationAllowed } = require('../lib/location-filter');
+const { isLocationAllowed, passesPrefs, matchesMetro, isRemote } = require('../lib/location-filter');
+const metros = require('../config/metros.json');
 
 describe('isLocationAllowed', () => {
   // The filter is env-configured via LOCATION_FILTER and LOCATION_BLOCKLIST.
@@ -179,6 +180,53 @@ describe('isLocationAllowed', () => {
   it('passes through specific cities when no filter is set', () => {
     assert.ok(isLocationAllowed('Austin, TX'));
     assert.ok(isLocationAllowed('Berlin, Germany'));
+  });
+});
+
+describe('passesPrefs (metro-aware)', () => {
+  const seattlePrefs = { metros: ['seattle'], remote: true, includeUnknown: true };
+  const seattleStrict = { metros: ['seattle'], remote: false, includeUnknown: false };
+
+  it('matches cities within the chosen metro', () => {
+    assert.ok(passesPrefs('Redmond, WA', seattlePrefs, metros));
+    assert.ok(passesPrefs('Bellevue, WA', seattlePrefs, metros));
+    assert.ok(passesPrefs('Seattle, WA', seattlePrefs, metros));
+  });
+
+  it('matches the metro state token (e.g. WA) even without a known city', () => {
+    assert.ok(passesPrefs('Spokane, WA', seattlePrefs, metros));
+  });
+
+  it('rejects out-of-metro cities', () => {
+    assert.equal(passesPrefs('San Francisco, CA', seattlePrefs, metros), false);
+    assert.equal(passesPrefs('San Francisco, CA, United States', seattlePrefs, metros), false);
+  });
+
+  it('honors the remote toggle', () => {
+    assert.ok(passesPrefs('Remote', seattlePrefs, metros));
+    assert.equal(passesPrefs('Remote', seattleStrict, metros), false);
+  });
+
+  it('honors the includeUnknown toggle', () => {
+    assert.ok(passesPrefs('', seattlePrefs, metros));
+    assert.equal(passesPrefs('', seattleStrict, metros), false);
+  });
+
+  it('passes everything when no metros and toggles default-on', () => {
+    const open = { metros: [], remote: true, includeUnknown: true };
+    assert.ok(passesPrefs('San Francisco, CA', open, metros));
+    assert.ok(passesPrefs('', open, metros));
+  });
+
+  it('isRemote detects common remote phrasings', () => {
+    assert.ok(isRemote('Remote'));
+    assert.ok(isRemote('Work from home'));
+    assert.ok(isRemote('US-only'));
+    assert.equal(isRemote('Seattle, WA'), false);
+  });
+
+  it('matchesMetro is case-insensitive', () => {
+    assert.ok(matchesMetro('REDMOND, wa', 'seattle', metros));
   });
 });
 

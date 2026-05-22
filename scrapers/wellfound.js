@@ -33,6 +33,7 @@ async function scrapeWellfound() {
         atsPlatformName: 'Remotive',
         scrapedTimestamp: new Date().toISOString(),
         description: stripHtml(job.description || ''),
+        location: job.candidate_required_location || 'Remote',
       }));
     }
   }

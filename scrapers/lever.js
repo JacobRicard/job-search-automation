@@ -20,6 +20,12 @@ async function scrapeLever() {
         if (section.content) parts.push(stripHtml(section.content));
       }
       if (job.closing) parts.push(stripHtml(job.closing));
+      const allLocations = Array.isArray(job.categories?.allLocations)
+        ? job.categories.allLocations.filter(Boolean)
+        : [];
+      const location = allLocations.length
+        ? allLocations.join(' | ')
+        : (job.categories?.location || '');
       return makeJobLead({
         title: job.text,
         company: company,
@@ -27,6 +33,7 @@ async function scrapeLever() {
         atsPlatformName: 'Lever',
         scrapedTimestamp: new Date().toISOString(),
         description: parts.filter(Boolean).join('\n\n'),
+        location,
       });
     },
   });
