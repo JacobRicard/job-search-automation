@@ -1860,7 +1860,47 @@ td {
 .help-page-header {
   position: relative;
   top: auto;
-  background: linear-gradient(180deg, rgba(6, 6, 10, 0.96), rgba(6, 6, 10, 0.9));
+  background: linear-gradient(180deg, rgba(20, 4, 38, 0.97) 0%, rgba(8, 4, 18, 0.93) 100%);
+  border-bottom: 1px solid rgba(168, 85, 247, 0.12);
+}
+
+.help-page-back {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  font-weight: 600;
+  color: rgba(240, 242, 247, 0.45);
+  text-decoration: none;
+  letter-spacing: 0.02em;
+  transition: color 0.15s ease;
+  margin-bottom: 14px;
+}
+
+.help-page-back:hover {
+  color: rgba(240, 242, 247, 0.85);
+}
+
+.help-page-header-copy {
+  max-width: 760px;
+}
+
+.help-page-card-body {
+  margin-top: 12px;
+  color: rgba(240, 242, 247, 0.74);
+  font-size: 14px;
+  line-height: 1.75;
+}
+
+.help-inline-code {
+  display: inline-block;
+  padding: 1px 6px;
+  border-radius: 6px;
+  background: rgba(168, 85, 247, 0.1);
+  border: 1px solid rgba(168, 85, 247, 0.2);
+  color: #e9d5ff;
+  font-family: 'JetBrains Mono', 'SF Mono', monospace;
+  font-size: 11.5px;
 }
 
 .help-page-header-inner,
@@ -1908,9 +1948,9 @@ td {
 }
 
 .help-page-toc-link:hover {
-  color: #dbe4ff;
-  background: rgba(138, 160, 255, 0.08);
-  border-color: rgba(138, 160, 255, 0.18);
+  color: #e9d5ff;
+  background: rgba(168, 85, 247, 0.08);
+  border-color: rgba(168, 85, 247, 0.25);
 }
 
 .help-page-kicker,
@@ -1919,7 +1959,7 @@ td {
   font-size: 11px;
   letter-spacing: 0.14em;
   text-transform: uppercase;
-  color: #8aa0ff;
+  color: #a855f7;
   font-weight: 700;
 }
 
@@ -1985,7 +2025,7 @@ td {
   border: 1px solid rgba(255, 255, 255, 0.09);
   background:
     linear-gradient(180deg, rgba(255, 255, 255, 0.04), rgba(255, 255, 255, 0.02)),
-    radial-gradient(circle at top right, rgba(91, 113, 255, 0.18), transparent 40%),
+    radial-gradient(circle at top right, rgba(168, 85, 247, 0.12), transparent 40%),
     rgba(7, 7, 12, 0.86);
   box-shadow: 0 24px 70px rgba(0, 0, 0, 0.28);
 }
@@ -2001,9 +2041,9 @@ td {
   margin: 0 8px 8px 0;
   padding: 7px 10px;
   border-radius: 999px;
-  border: 1px solid rgba(138, 160, 255, 0.18);
-  background: rgba(138, 160, 255, 0.08);
-  color: #dbe4ff;
+  border: 1px solid rgba(168, 85, 247, 0.25);
+  background: rgba(168, 85, 247, 0.08);
+  color: #e9d5ff;
   font-size: 12px;
 }
 
@@ -2035,7 +2075,7 @@ td {
   border-radius: 18px;
   border: 1px solid rgba(255, 255, 255, 0.08);
   background: rgba(2, 6, 23, 0.62);
-  color: #dbe4ff;
+  color: #e9d5ff;
 }
 
 .help-page-card pre {
@@ -2054,9 +2094,9 @@ td {
   display: inline-block;
   padding: 1px 6px;
   border-radius: 6px;
-  background: rgba(138, 160, 255, 0.1);
-  border: 1px solid rgba(138, 160, 255, 0.14);
-  color: #dbe4ff;
+  background: rgba(168, 85, 247, 0.1);
+  border: 1px solid rgba(168, 85, 247, 0.2);
+  color: #e9d5ff;
 }
 
 .help-page-section {
@@ -2072,12 +2112,20 @@ td {
   gap: 18px;
 }
 
+.help-page-grid-1 {
+  grid-template-columns: minmax(0, 1fr);
+}
+
 .help-page-grid-2 {
   grid-template-columns: repeat(2, minmax(0, 1fr));
 }
 
 .help-page-grid-3 {
   grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.help-page-card--wide .help-page-table {
+  max-width: 680px;
 }
 
 .help-page-card {
