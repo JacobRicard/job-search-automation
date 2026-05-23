@@ -28,7 +28,7 @@ All filter tab metadata (IDs, labels, colors, count keys) lives in a single `FIL
 
 Profiles are isolated by environment variables, not by code branching.
 
-**Why:** Multiple users (for example a couple or a small group sharing the pipeline) need completely separate DBs, resumes, and contexts but identical code. Env vars keep it DRY. Each profile has its own `.env` under `profiles/<name>/`, the `run-daily.sh` loops through all profiles, the scraper runs once (shared) and each profile scores against its own resume/context.
+**Why:** Multiple users (for example a couple or a small group sharing the pipeline) need completely separate DBs, resumes, and contexts but identical code. Env vars keep it DRY. Each profile has its own `.env` under `profiles/<name>/`, `scripts/refresh.js` runs the daily pipeline per profile, the scraper runs once (shared) and each profile scores against its own resume/context.
 
 ## Events table for audit trail
 

@@ -32,6 +32,6 @@ Free-tier friendly, structured output via JSON schema, good enough quality for t
 
 ## Shell scripts for orchestration
 
-`run-daily.sh` loops through profiles. `start-dashboard.sh` kills any stale port holder and starts the dashboard. No Makefile, no npm chains.
+`scripts/refresh.js` runs the daily pipeline (via `npm run refresh`). `scripts/start-dashboard.sh` kills any stale port holder and starts the dashboard. No Makefile.
 
 **Why:** Bash is zero-dependency and runs under any cron. npm scripts exist too, but bash is the cron-facing surface.

@@ -29,7 +29,7 @@ Isolated profiles via env vars:
 - `DASHBOARD_PORT` — dashboard HTTP port (default 3131)
 - `JOB_PROFILE_DIR` — directory containing `resume.md` and `context.md`
 
-Each profile has its own `.env` in `profiles/<name>/`. The `run-daily.sh` loops through all profiles. Scraper runs once (shared), then each profile scores against its own resume/context.
+Each profile has its own `.env` in `profiles/<name>/`. `scripts/refresh.js` runs the daily pipeline per profile. Scraper runs once (shared), then each profile scores against its own resume/context.
 
 ## Key features
 

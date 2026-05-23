@@ -84,7 +84,7 @@ Show: approved / rejected this session, pending remaining, dashboard link http:/
 
 **"run the pipeline now"**, run in background:
 ```bash
-/bin/zsh ~/job-search/run-daily.sh >> /tmp/job-search.log 2>&1 &
+npm run refresh >> /tmp/job-search.log 2>&1 &
 echo "Running. Check /tmp/job-search.log for progress."
 ```
 
