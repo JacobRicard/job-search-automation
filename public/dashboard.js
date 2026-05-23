@@ -25,15 +25,30 @@ function togglePanel(id) {
 function toggleNavMenu()     { togglePanel('nav-menu'); }
 function toggleFilterPanel() { togglePanel('filter-panel'); }
 
-// ── Metro area select ─────────────────────────────────────────────────
-function applyMetroSelect(el) {
-  const metro = el.value;
-  el.style.color = metro ? 'var(--accent)' : '';
+// ── Metro area selects ────────────────────────────────────────────────
+function _saveLocationPrefs(patch) {
   fetch('/api/location-prefs', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ metros: metro ? [metro] : [], includeUnknown: true }),
+    body: JSON.stringify(patch),
   }).then(() => window.location.reload());
+}
+
+function applyMetroSelect(el) {
+  const metro = el.value;
+  el.style.color = metro ? 'var(--accent)' : '';
+  const unlistedEl = el.closest('.header-sub')?.querySelectorAll('.metro-select')[1];
+  const includeUnknown = unlistedEl ? unlistedEl.value !== 'hide' : true;
+  _saveLocationPrefs({ metros: metro ? [metro] : [], includeUnknown });
+}
+
+function applyUnlistedSelect(el) {
+  const includeUnknown = el.value !== 'hide';
+  el.style.color = !includeUnknown ? 'var(--accent)' : '';
+  // preserve current metro selection by reading the other select
+  const metroEl = el.closest('.header-sub')?.querySelector('.metro-select');
+  const metro = metroEl ? metroEl.value : '';
+  _saveLocationPrefs({ metros: metro ? [metro] : [], includeUnknown });
 }
 
 // ── Job action menus ─────────────────────────────────────────────────
