@@ -47,11 +47,12 @@ function toggleLocationPanel() {
 }
 
 function readLocationPrefsFromPanel() {
-  const select = document.getElementById('loc-select');
-  const unlistedChk = document.getElementById('loc-include-unlisted');
-  if (!select) return null;
-  const metros = [...select.selectedOptions].map((o) => o.value);
-  const includeUnknown = unlistedChk ? unlistedChk.checked : true;
+  const panel = document.getElementById('location-panel');
+  if (!panel) return null;
+  const metros = [...panel.querySelectorAll('.loc-option[data-metro].checked')]
+    .map((el) => el.getAttribute('data-metro'));
+  const unlistedBtn = document.getElementById('loc-include-unlisted');
+  const includeUnknown = unlistedBtn ? unlistedBtn.classList.contains('checked') : true;
   return { metros, includeUnknown };
 }
 
