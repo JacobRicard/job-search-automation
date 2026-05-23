@@ -6,52 +6,34 @@ const ICON_CHECK = `<svg xmlns="http://www.w3.org/2000/svg" width="13" height="1
 
 let _currentJobId = null;
 
-// ── Nav menu (hamburger) ────────────────────────────────────────────
-function toggleNavMenu() {
-  const menu = document.getElementById('nav-menu');
-  const btn = document.getElementById('nav-menu-btn');
-  if (!menu) return;
-  const isOpen = menu.classList.toggle('open');
-  if (btn) btn.classList.toggle('active', isOpen);
+// ── Header popovers (nav menu, filter panel, location panel) ─────────
+const PANEL_IDS = ['nav-menu', 'filter-panel', 'location-panel'];
+
+function togglePanel(id) {
+  const panel = document.getElementById(id);
+  if (!panel) return;
+  const isOpen = panel.classList.toggle('open');
+  document.getElementById(id + '-btn')?.classList.toggle('active', isOpen);
   if (isOpen) {
-    document.getElementById('filter-panel')?.classList.remove('open');
-    document.getElementById('filter-panel-btn')?.classList.remove('active');
+    PANEL_IDS.filter(p => p !== id).forEach(p => {
+      document.getElementById(p)?.classList.remove('open');
+      document.getElementById(p + '-btn')?.classList.remove('active');
+    });
   }
 }
 
-// ── Filter popover ───────────────────────────────────────────────────
-function toggleFilterPanel() {
-  const panel = document.getElementById('filter-panel');
-  const btn = document.getElementById('filter-panel-btn');
-  if (!panel) return;
-  const isOpen = panel.classList.toggle('open');
-  if (btn) btn.classList.toggle('active', isOpen);
-  if (isOpen) {
-    document.getElementById('nav-menu')?.classList.remove('open');
-    document.getElementById('nav-menu-btn')?.classList.remove('active');
-    document.getElementById('location-panel')?.classList.remove('open');
-  }
-}
-
-// ── Location popover ─────────────────────────────────────────────────
-function toggleLocationPanel() {
-  const panel = document.getElementById('location-panel');
-  const btn = document.getElementById('location-panel-btn');
-  if (!panel) return;
-  const isOpen = panel.classList.toggle('open');
-  if (btn) btn.classList.toggle('active', isOpen);
-  if (isOpen) {
-    document.getElementById('nav-menu')?.classList.remove('open');
-    document.getElementById('filter-panel')?.classList.remove('open');
-  }
-}
+function toggleNavMenu()       { togglePanel('nav-menu'); }
+function toggleFilterPanel()   { togglePanel('filter-panel'); }
+function toggleLocationPanel() { togglePanel('location-panel'); }
 
 function readLocationPrefsFromPanel() {
   const panel = document.getElementById('location-panel');
   if (!panel) return null;
-  const metros = [...panel.querySelectorAll('input[data-metro]:checked')]
+  const metros = [...panel.querySelectorAll('.loc-option[data-metro].checked')]
     .map((el) => el.getAttribute('data-metro'));
-  return { metros };
+  const unlistedBtn = document.getElementById('loc-include-unlisted');
+  const includeUnknown = unlistedBtn ? unlistedBtn.classList.contains('checked') : true;
+  return { metros, includeUnknown };
 }
 
 function applyLocationPrefs() {
@@ -125,25 +107,16 @@ document.addEventListener('click', e => {
     }
   }
 
-  // Nav menu
-  const navMenu = document.getElementById('nav-menu');
-  const navBtn = document.getElementById('nav-menu-btn');
-  if (navMenu && navMenu.classList.contains('open')) {
-    if (!navMenu.contains(e.target) && navBtn && !navBtn.contains(e.target)) {
-      navMenu.classList.remove('open');
-      if (navBtn) navBtn.classList.remove('active');
+  // Header popovers
+  PANEL_IDS.forEach(id => {
+    const panel = document.getElementById(id);
+    const btn = document.getElementById(id + '-btn');
+    if (panel?.classList.contains('open') &&
+        !panel.contains(e.target) && btn && !btn.contains(e.target)) {
+      panel.classList.remove('open');
+      btn.classList.remove('active');
     }
-  }
-
-  // Filter panel
-  const filterPanel = document.getElementById('filter-panel');
-  const filterBtn = document.getElementById('filter-panel-btn');
-  if (filterPanel && filterPanel.classList.contains('open')) {
-    if (!filterPanel.contains(e.target) && filterBtn && !filterBtn.contains(e.target)) {
-      filterPanel.classList.remove('open');
-      if (filterBtn) filterBtn.classList.remove('active');
-    }
-  }
+  });
 
   // Job action menus
   if (!e.target.closest('.job-col-actions')) {
