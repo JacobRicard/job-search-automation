@@ -6,8 +6,8 @@ const ICON_CHECK = `<svg xmlns="http://www.w3.org/2000/svg" width="13" height="1
 
 let _currentJobId = null;
 
-// ── Header popovers (nav menu, filter panel, location panel) ─────────
-const PANEL_IDS = ['nav-menu', 'filter-panel', 'location-panel'];
+// ── Header popovers (nav menu, filter panel) ─────────────────────────
+const PANEL_IDS = ['nav-menu', 'filter-panel'];
 
 function togglePanel(id) {
   const panel = document.getElementById(id);
@@ -22,26 +22,17 @@ function togglePanel(id) {
   }
 }
 
-function toggleNavMenu()       { togglePanel('nav-menu'); }
-function toggleFilterPanel()   { togglePanel('filter-panel'); }
-function toggleLocationPanel() { togglePanel('location-panel'); }
+function toggleNavMenu()     { togglePanel('nav-menu'); }
+function toggleFilterPanel() { togglePanel('filter-panel'); }
 
-function readLocationPrefsFromPanel() {
-  const panel = document.getElementById('location-panel');
-  if (!panel) return null;
-  const metros = [...panel.querySelectorAll('.loc-option[data-metro].checked')]
-    .map((el) => el.getAttribute('data-metro'));
-  const unlistedBtn = document.getElementById('loc-include-unlisted');
-  const includeUnknown = unlistedBtn ? unlistedBtn.classList.contains('checked') : true;
-  return { metros, includeUnknown };
-}
-
-function applyLocationPrefs() {
-  const prefs = readLocationPrefsFromPanel() || { metros: [] };
+// ── Metro area select ─────────────────────────────────────────────────
+function applyMetroSelect(el) {
+  const metro = el.value;
+  el.style.color = metro ? 'var(--accent)' : '';
   fetch('/api/location-prefs', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(prefs),
+    body: JSON.stringify({ metros: metro ? [metro] : [], includeUnknown: true }),
   }).then(() => window.location.reload());
 }
 
