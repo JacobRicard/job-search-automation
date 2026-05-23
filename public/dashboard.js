@@ -34,7 +34,6 @@ function toggleFilterPanel() {
 }
 
 // ── Location popover ─────────────────────────────────────────────────
-let _locationSaveTimer = null;
 function toggleLocationPanel() {
   const panel = document.getElementById('location-panel');
   const btn = document.getElementById('location-panel-btn');
@@ -55,24 +54,12 @@ function readLocationPrefsFromPanel() {
   return { metros };
 }
 
-function onLocationChange() {
-  clearTimeout(_locationSaveTimer);
-  _locationSaveTimer = setTimeout(() => {
-    const prefs = readLocationPrefsFromPanel();
-    if (!prefs) return;
-    fetch('/api/location-prefs', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(prefs),
-    }).then(() => window.location.reload());
-  }, 250);
-}
-
-function clearLocationPrefs() {
+function applyLocationPrefs() {
+  const prefs = readLocationPrefsFromPanel() || { metros: [] };
   fetch('/api/location-prefs', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ metros: [] }),
+    body: JSON.stringify(prefs),
   }).then(() => window.location.reload());
 }
 
