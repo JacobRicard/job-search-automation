@@ -18,7 +18,8 @@
     "test": "node --test",
     "validate-slugs": "node --env-file=.env scripts/validate-slugs.js",
     "validate-slugs:broken": "node --env-file=.env scripts/validate-slugs.js --broken-only",
-    "test:contracts": "python3 -m unittest discover -s test_py"
+    "test:contracts": "python3 -m unittest discover -s test_py",
+    "setup": "sh scripts/setup.sh"
   },
   "dependencies": {
     "better-sqlite3": "^12.9.0",
