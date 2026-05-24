@@ -29,8 +29,8 @@ function toggleLocationPanel() { togglePanel('location-panel'); }
 function readLocationPrefsFromPanel() {
   const panel = document.getElementById('location-panel');
   if (!panel) return null;
-  const metros = [...panel.querySelectorAll('.loc-option[data-metro].checked')]
-    .map((el) => el.getAttribute('data-metro'));
+  const sel = document.getElementById('loc-metro-select');
+  const metros = sel && sel.value ? [sel.value] : [];
   const unlistedBtn = document.getElementById('loc-include-unlisted');
   const includeUnknown = unlistedBtn ? unlistedBtn.checked : true;
   return { metros, includeUnknown };
