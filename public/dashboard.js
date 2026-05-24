@@ -6,8 +6,8 @@ const ICON_CHECK = `<svg xmlns="http://www.w3.org/2000/svg" width="13" height="1
 
 let _currentJobId = null;
 
-// ── Header popovers (nav menu, filter panel, location panel) ─────────
-const PANEL_IDS = ['nav-menu', 'filter-panel', 'location-panel'];
+// ── Header popovers (nav menu, filter panel) ─────────────────────────
+const PANEL_IDS = ['nav-menu', 'filter-panel'];
 
 function togglePanel(id) {
   const panel = document.getElementById(id);
@@ -22,22 +22,19 @@ function togglePanel(id) {
   }
 }
 
-function toggleNavMenu()       { togglePanel('nav-menu'); }
-function toggleFilterPanel()   { togglePanel('filter-panel'); }
-function toggleLocationPanel() { togglePanel('location-panel'); }
+function toggleNavMenu()     { togglePanel('nav-menu'); }
+function toggleFilterPanel() { togglePanel('filter-panel'); }
 
-function readLocationPrefsFromPanel() {
-  const panel = document.getElementById('location-panel');
-  if (!panel) return null;
+function readLocationPrefs() {
   const sel = document.getElementById('loc-metro-select');
   const metros = sel && sel.value ? [sel.value] : [];
-  const unlistedBtn = document.getElementById('loc-include-unlisted');
-  const includeUnknown = unlistedBtn ? unlistedBtn.checked : true;
+  const cb = document.getElementById('loc-include-unlisted');
+  const includeUnknown = cb ? cb.checked : true;
   return { metros, includeUnknown };
 }
 
 function applyLocationPrefs() {
-  const prefs = readLocationPrefsFromPanel() || { metros: [] };
+  const prefs = readLocationPrefs() || { metros: [] };
   fetch('/api/location-prefs', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
