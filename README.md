@@ -41,7 +41,12 @@ cp .env.example .env
 # 3. Get a FREE Gemini API key at https://aistudio.google.com/apikey
 #    Paste it into .env as GEMINI_API_KEY=...
 
-# 4. Bring it up
+# 4. Set up your profile (replace 'yourname' with whatever you like)
+./scripts/setup.sh yourname
+#    Follow the printed instructions: edit the three profile files,
+#    then update JOB_PROFILE_DIR and JOB_DB_PATH in .env.
+
+# 5. Bring it up
 docker compose up -d
 ```
 
@@ -89,6 +94,35 @@ Everything is in `.env`. The defaults work for most people; the file is heavily 
 | `REFRESH_INTERVAL_MINUTES` | How often the worker container runs the full refresh. Default `30`. |
 | `GMAIL_EMAIL` / `GMAIL_APP_PASSWORD` | Optional. Enables rejection email sync. Use a Google [app password](https://myaccount.google.com/apppasswords). |
 | `DASHBOARD_PORT` | Default `3131` |
+
+## Personalizing your profile
+
+The `profiles/` directory is where all your personal data lives. The repo ships an example profile (`profiles/example`) so the app works out of the box, but you need to replace it with your own before the scoring means anything.
+
+Run `./scripts/setup.sh yourname` (or `npm run setup -- yourname`) to copy the example to a new profile directory, then edit three files:
+
+| File | What to put there |
+| --- | --- |
+| `resume.md` | Your resume in plain text or markdown. Gemini reads this to score job fit. Prose, bullets, tables — any format works. |
+| `context.md` | Target titles, preferred tech stack, comp range, location preferences, deal breakers. This narrows scoring beyond what the resume alone captures. |
+| `companies.js` | The companies you want to scrape, grouped by ATS platform. Update `SEARCH_TERMS` at the top to match your target role (e.g. `'product manager'`, `'data engineer'`). For each company, use the slug from its public job-board URL: `boards.greenhouse.io/stripe` → slug `stripe`. |
+
+After editing, update `.env` so the app points at your profile:
+
+```
+JOB_PROFILE_DIR=profiles/yourname
+JOB_DB_PATH=profiles/yourname/jobs.db
+```
+
+**Skipping this step** means jobs are scored against the example SRE resume and you'll see listings for Stripe, Airbnb, and other demo companies.
+
+## Claude Code users
+
+The `.context/` directory and `.claude/` folder contain AI-assistant instructions for slash commands like `/load-context`, `/job-search`, and `/interview-prep`. They are not required to run the app.
+
+If you use Claude Code: copy `.context.example` to `.context`, copy `profiles/example` to `profiles/yourname`, and edit both to match you.
+
+If you don't: ignore `.context/`, `.claude/`, and `CLAUDE.md` entirely. The scraper, scorer, and dashboard run fine without them.
 
 ## Stopping and updating
 
