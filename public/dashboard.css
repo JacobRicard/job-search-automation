@@ -286,13 +286,8 @@ header {
 /* ── Location filter (inline native controls) ───────────────── */
 
 .loc-metro-select {
-  background: var(--bg-primary);
-  border: 1px solid var(--border);
-  border-radius: 5px;
   height: 26px;
-  padding: 0 6px;
   font-size: 0.72rem;
-  font-family: inherit;
   cursor: pointer;
 }
 
