@@ -391,7 +391,14 @@ header {
   flex: 1;
 }
 
-.loc-unlisted-option {
+.loc-unlisted-label {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 14px;
+  font-size: 13px;
+  color: var(--text-primary);
+  cursor: pointer;
   margin-top: 2px;
 }
 

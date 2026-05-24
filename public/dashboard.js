@@ -32,7 +32,7 @@ function readLocationPrefsFromPanel() {
   const metros = [...panel.querySelectorAll('.loc-option[data-metro].checked')]
     .map((el) => el.getAttribute('data-metro'));
   const unlistedBtn = document.getElementById('loc-include-unlisted');
-  const includeUnknown = unlistedBtn ? unlistedBtn.classList.contains('checked') : true;
+  const includeUnknown = unlistedBtn ? unlistedBtn.checked : true;
   return { metros, includeUnknown };
 }
 
