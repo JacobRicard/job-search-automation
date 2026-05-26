@@ -286,10 +286,17 @@ header {
 /* ── Location filter (inline native controls) ───────────────── */
 
 .loc-metro-select {
+  background: var(--bg-primary);
+  border: 1px solid var(--border);
+  border-radius: 5px;
   height: 26px;
+  padding: 0 8px;
   font-size: 0.72rem;
+  font-weight: 700;
+  font-family: inherit;
+  color: var(--accent);
   cursor: pointer;
-  color-scheme: light;
+  color-scheme: dark;
 }
 
 .loc-unlisted-label {
