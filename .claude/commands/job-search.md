@@ -5,13 +5,13 @@ allowed-tools: Bash, Read
 
 ## Step 0: Resolve profile
 
-Read `.env` to find `JOB_DB_PATH` and `DASHBOARD_PORT`. If `.env` is missing, default to `JOB_DB_PATH=profiles/example/jobs.db` and `DASHBOARD_PORT=3131`.
+Read `.env` to find `DATA_DIR_DB` and `DASHBOARD_PORT`. If `.env` is missing, default to `DATA_DIR_DB=data/jobs.db` and `DASHBOARD_PORT=3131`.
 
 ## Step 1: Stats
 
 ```bash
 node -e "
-const db = require('better-sqlite3')(process.env.JOB_DB_PATH || 'profiles/example/jobs.db');
+const db = require('better-sqlite3')(process.env.DATA_DIR_DB || 'data/jobs.db');
 console.log(JSON.stringify({
   total:     db.prepare('SELECT COUNT(*) c FROM jobs').get().c,
   pending:   db.prepare(\"SELECT COUNT(*) c FROM jobs WHERE status='pending'\").get().c,
@@ -31,7 +31,7 @@ Show stats clearly. Note how many high-scoring (7+) pending jobs await review.
 
 ```bash
 node -e "
-const db = require('better-sqlite3')(process.env.JOB_DB_PATH || 'profiles/example/jobs.db');
+const db = require('better-sqlite3')(process.env.DATA_DIR_DB || 'data/jobs.db');
 const jobs = db.prepare(\"SELECT id, title, company, platform, location, url, score, reasoning FROM jobs WHERE status='pending' AND score >= 7 ORDER BY score DESC LIMIT 20\").all();
 console.log(JSON.stringify(jobs, null, 2));
 "
@@ -55,17 +55,17 @@ After each reply, update the DB immediately:
 
 - `approve` / `yes` / `y` → set `status='applied'`:
 ```bash
-node -e "require('better-sqlite3')(process.env.JOB_DB_PATH || 'profiles/example/jobs.db').prepare(\"UPDATE jobs SET status='applied', applied_at=COALESCE(applied_at, datetime('now')), updated_at=datetime('now') WHERE id=?\").run('JOB_ID');"
+node -e "require('better-sqlite3')(process.env.DATA_DIR_DB || 'data/jobs.db').prepare(\"UPDATE jobs SET status='applied', applied_at=COALESCE(applied_at, datetime('now')), updated_at=datetime('now') WHERE id=?\").run('JOB_ID');"
 ```
 
 - `reject` / `no` / `n` → set `status='archived'`, `stage='rejected'`:
 ```bash
-node -e "require('better-sqlite3')(process.env.JOB_DB_PATH || 'profiles/example/jobs.db').prepare(\"UPDATE jobs SET status='archived', stage='rejected', rejected_at=datetime('now'), updated_at=datetime('now') WHERE id=?\").run('JOB_ID');"
+node -e "require('better-sqlite3')(process.env.DATA_DIR_DB || 'data/jobs.db').prepare(\"UPDATE jobs SET status='archived', stage='rejected', rejected_at=datetime('now'), updated_at=datetime('now') WHERE id=?\").run('JOB_ID');"
 ```
 
 - `archive` / `a` → set `status='archived'` (no stage):
 ```bash
-node -e "require('better-sqlite3')(process.env.JOB_DB_PATH || 'profiles/example/jobs.db').prepare(\"UPDATE jobs SET status='archived', updated_at=datetime('now') WHERE id=?\").run('JOB_ID');"
+node -e "require('better-sqlite3')(process.env.DATA_DIR_DB || 'data/jobs.db').prepare(\"UPDATE jobs SET status='archived', updated_at=datetime('now') WHERE id=?\").run('JOB_ID');"
 ```
 
 - `skip` / `s` → stay `pending`, move on
@@ -89,19 +89,19 @@ echo "Running. Check /tmp/job-search.log for progress."
 
 **"what have I applied to":**
 ```bash
-node -e "const db=require('better-sqlite3')(process.env.JOB_DB_PATH||'profiles/example/jobs.db');console.log(JSON.stringify(db.prepare(\"SELECT title,company,url,status,updated_at FROM jobs WHERE status IN ('applied','responded') ORDER BY updated_at DESC\").all(),null,2));"
+node -e "const db=require('better-sqlite3')(process.env.DATA_DIR_DB||'data/jobs.db');console.log(JSON.stringify(db.prepare(\"SELECT title,company,url,status,updated_at FROM jobs WHERE status IN ('applied','responded') ORDER BY updated_at DESC\").all(),null,2));"
 ```
 
 **"mark [Company] as responded":** find job by company name, update `status='responded'`.
 
 **"show archived":**
 ```bash
-node -e "const db=require('better-sqlite3')(process.env.JOB_DB_PATH||'profiles/example/jobs.db');console.log(JSON.stringify(db.prepare(\"SELECT title,company,url,score,updated_at FROM jobs WHERE status='archived' ORDER BY updated_at DESC\").all(),null,2));"
+node -e "const db=require('better-sqlite3')(process.env.DATA_DIR_DB||'data/jobs.db');console.log(JSON.stringify(db.prepare(\"SELECT title,company,url,score,updated_at FROM jobs WHERE status='archived' ORDER BY updated_at DESC\").all(),null,2));"
 ```
 
 **"unarchive [Company]":** find job by company name, update `status='pending'`.
 
 **"reject all below 6":**
 ```bash
-node -e "const r=require('better-sqlite3')(process.env.JOB_DB_PATH||'profiles/example/jobs.db').prepare(\"UPDATE jobs SET status='archived', stage='rejected', rejected_at=datetime('now'), updated_at=datetime('now') WHERE status='pending' AND score < 6\").run();console.log('rejected '+r.changes);"
+node -e "const r=require('better-sqlite3')(process.env.DATA_DIR_DB||'data/jobs.db').prepare(\"UPDATE jobs SET status='archived', stage='rejected', rejected_at=datetime('now'), updated_at=datetime('now') WHERE status='pending' AND score < 6\").run();console.log('rejected '+r.changes);"
 ```

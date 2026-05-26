@@ -10,9 +10,9 @@ allowed-tools: Read, Bash
 
 ## Step 1: Find the active profile
 
-Read `.env` and use `JOB_PROFILE_DIR` as the active profile directory.
-Default to `profiles/example` if `JOB_PROFILE_DIR` is not set.
-Use an ignored-file-aware listing command such as `rg --files -u {JOB_PROFILE_DIR}` or `find {JOB_PROFILE_DIR} -type f` so gitignored profile files are not missed.
+Read `.env` and use `DATA_DIR` as the active profile directory.
+Default to `data` if `DATA_DIR` is not set.
+Use an ignored-file-aware listing command such as `rg --files -u {DATA_DIR}` or `find {DATA_DIR} -type f` so gitignored profile files are not missed.
 
 ## Step 2: Read session context
 
@@ -26,17 +26,17 @@ Read the following files in full and internalize them before responding:
 
 ## Step 3: Read active profile source files
 
-Read every human-readable source/context file under `{JOB_PROFILE_DIR}` recursively, especially:
+Read every human-readable source/context file under `{DATA_DIR}` recursively, especially:
 
-- `{JOB_PROFILE_DIR}/context.md` — full career context, preferences, deal breakers
-- `{JOB_PROFILE_DIR}/career-detail.md` — deep project documentation and honest career narrative
-- `{JOB_PROFILE_DIR}/resume*.md` — current resume variants
-- `{JOB_PROFILE_DIR}/experience/*.md` — per-company experience details
-- `{JOB_PROFILE_DIR}/companies.js` — target company lists
-- `{JOB_PROFILE_DIR}/auto-apply-config.js` — auto-apply defaults
-- `{JOB_PROFILE_DIR}/dud-slugs.md` — known invalid ATS slugs
-- `{JOB_PROFILE_DIR}/auto-apply-overrides/*.json` — saved application question answers
-- `{JOB_PROFILE_DIR}/tailored-resumes/**/metadata.json` and `resume.md` — tailored resume context
+- `data/context.md` — full career context, preferences, deal breakers
+- `data/career-detail.md` — deep project documentation and honest career narrative
+- `data/resume*.md` — current resume variants
+- `data/experience/*.md` — per-company experience details
+- `data/companies.js` — target company lists
+- `data/auto-apply-config.js` — auto-apply defaults
+- `data/dud-slugs.md` — known invalid ATS slugs
+- `data/auto-apply-overrides/*.json` — saved application question answers
+- `data/tailored-resumes/**/metadata.json` and `resume.md` — tailored resume context
 
 Do not read binary or generated runtime artifacts as session context unless explicitly asked:
 

@@ -28,9 +28,7 @@ const DEFAULT_CONCURRENCY = 8;
 
 const log = createLogger('resolve-greenhouse-slugs', { logFile: logPaths.daily('resolve-greenhouse-slugs') });
 
-const profileDir = process.env.JOB_PROFILE_DIR
-  ? path.resolve(repoRoot, process.env.JOB_PROFILE_DIR)
-  : path.join(repoRoot, 'profiles', 'example');
+const { baseDir: profileDir } = require('../config/paths');
 
 function usage() {
   return `Usage:

@@ -19,14 +19,14 @@ Use this skill to prepare application question answers and dashboard Copy Answer
 
 Read `.env` first and resolve:
 
-- `JOB_DB_PATH`
-- `JOB_PROFILE_DIR`
+- `DATA_DIR_DB`
+- `DATA_DIR`
 
 Load these profile files when drafting free-text answers:
 
-- `{JOB_PROFILE_DIR}/context.md`
-- `{JOB_PROFILE_DIR}/career-detail.md`
-- `{JOB_PROFILE_DIR}/resume.md`
+- `data/context.md`
+- `data/career-detail.md`
+- `data/resume.md`
 - `.context/people/voice.md`
 
 If the newer Jake-specific voice files exist, prefer them:

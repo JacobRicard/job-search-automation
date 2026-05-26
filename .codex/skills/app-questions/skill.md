@@ -9,15 +9,15 @@ Answer application questions on Jake's behalf. Write the answer first, then anal
 
 ## Step 1: Load context
 
-Read `.env` to find `JOB_PROFILE_DIR`. Default: `profiles/example`.
+Read `.env` to find `DATA_DIR`. Default: `data`.
 
 Load these files before drafting any answer:
 
 - `.context/people/jake.md`
 - `.context/people/jake-voice.md`
-- `{JOB_PROFILE_DIR}/context.md`
-- `{JOB_PROFILE_DIR}/career-detail.md`
-- `{JOB_PROFILE_DIR}/resume.md`
+- `data/context.md`
+- `data/career-detail.md`
+- `data/resume.md`
 
 If the old generic files exist instead, use them as fallback:
 

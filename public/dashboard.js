@@ -325,6 +325,136 @@ document.getElementById('jd-modal').addEventListener('click', e => {
 });
 
 // ---------------------------------------------------------------------------
+// Onboarding wizard
+// ---------------------------------------------------------------------------
+
+var _wizardStep = 0;
+
+(function initWizard() {
+  if (!window.__FIRST_RUN__) return;
+  if (localStorage.getItem('jsa_setup_done')) return;
+
+  fetch('/api/setup/status')
+    .then(function(r) { return r.json(); })
+    .then(function(data) {
+      if (data.resumeContent) {
+        var el = document.getElementById('wizard-resume');
+        if (el) el.value = data.resumeContent;
+      }
+    })
+    .catch(function() {});
+
+  var overlay = document.getElementById('onboarding-wizard');
+  if (overlay) overlay.classList.add('open');
+})();
+
+function wizardGoTo(step) {
+  var steps = document.querySelectorAll('.wizard-step');
+  var dots = document.querySelectorAll('.wizard-dot');
+  steps.forEach(function(el, i) {
+    el.classList.toggle('active', i === step);
+  });
+  dots.forEach(function(el, i) {
+    el.classList.toggle('active', i === step);
+    el.classList.toggle('done', i < step);
+  });
+  _wizardStep = step;
+}
+
+function wizardNext() { wizardGoTo(_wizardStep + 1); }
+function wizardBack() { wizardGoTo(_wizardStep - 1); }
+
+function wizardTestKey() {
+  var key = (document.getElementById('wizard-api-key') || {}).value || '';
+  var status = document.getElementById('wizard-key-status');
+  var btn = document.getElementById('wizard-test-btn');
+  if (!key.trim()) {
+    if (status) { status.textContent = 'Enter a key first.'; status.style.color = 'var(--red)'; }
+    return;
+  }
+  if (status) { status.textContent = 'Testing...'; status.style.color = 'var(--text-muted)'; }
+  if (btn) btn.disabled = true;
+  fetch('/api/setup/test-key', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ key: key.trim() }),
+  })
+    .then(function(r) { return r.json(); })
+    .then(function(data) {
+      if (status) {
+        status.textContent = data.ok ? 'Key is valid!' : (data.error || 'Key invalid.');
+        status.style.color = data.ok ? 'var(--green)' : 'var(--red)';
+      }
+      if (btn) btn.disabled = false;
+    })
+    .catch(function() {
+      if (status) { status.textContent = 'Test failed.'; status.style.color = 'var(--red)'; }
+      if (btn) btn.disabled = false;
+    });
+}
+
+function wizardSaveKey() {
+  var key = (document.getElementById('wizard-api-key') || {}).value || '';
+  if (!key.trim()) { wizardNext(); return; }
+  var saveBtn = document.getElementById('wizard-key-save-btn');
+  if (saveBtn) saveBtn.disabled = true;
+  fetch('/api/setup/api-key', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ key: key.trim() }),
+  })
+    .catch(function() {})
+    .finally(function() {
+      if (saveBtn) saveBtn.disabled = false;
+      wizardNext();
+    });
+}
+
+function wizardSaveResume() {
+  var content = (document.getElementById('wizard-resume') || {}).value || '';
+  if (!content.trim()) { wizardNext(); return; }
+  fetch('/api/setup/resume', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ content: content }),
+  })
+    .catch(function() {})
+    .finally(function() { wizardNext(); });
+}
+
+function wizardSaveProfile() {
+  var titles = (document.getElementById('wizard-titles') || {}).value || '';
+  var stack = (document.getElementById('wizard-stack') || {}).value || '';
+  var salary = (document.getElementById('wizard-salary') || {}).value || '';
+  var location = (document.getElementById('wizard-location') || {}).value || '';
+  fetch('/api/setup/profile', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ titles: titles, stack: stack, salary: salary, location: location }),
+  })
+    .catch(function() {})
+    .finally(function() { wizardNext(); });
+}
+
+function wizardSaveCompanies() {
+  var terms = (document.getElementById('wizard-terms') || {}).value || '';
+  fetch('/api/setup/companies', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ searchTerms: terms }),
+  })
+    .catch(function() {})
+    .finally(function() { wizardNext(); });
+}
+
+function wizardDone() {
+  localStorage.setItem('jsa_setup_done', '1');
+  var overlay = document.getElementById('onboarding-wizard');
+  if (overlay) overlay.classList.remove('open');
+  showToast('Profile saved. First jobs will appear soon.', '#22c55e');
+}
+
+// ---------------------------------------------------------------------------
 // Score comparison pagination (analytics page)
 // ---------------------------------------------------------------------------
 

@@ -10,12 +10,12 @@ version: 2.0.0
 allowed-tools: Bash, Read
 ---
 
-Job search DB: `~/job-search/profiles/jake/jobs.db`. Dashboard: http://localhost:3131
+Job search DB: `~/job-search/data/jobs.db`. Dashboard: http://localhost:3131
 
 ## Step 1: Stats
 
 !`cd ~/job-search && node -e "
-const db = require('better-sqlite3')('profiles/jake/jobs.db');
+const db = require('better-sqlite3')('data/jobs.db');
 console.log(JSON.stringify({
   total:     db.prepare('SELECT COUNT(*) c FROM jobs').get().c,
   pending:   db.prepare(\"SELECT COUNT(*) c FROM jobs WHERE status='pending'\").get().c,
@@ -33,7 +33,7 @@ Show stats clearly. Note how many high-scoring (7+) pending jobs await review.
 ## Step 2: Load pending jobs
 
 !`cd ~/job-search && node -e "
-const db = require('better-sqlite3')('profiles/jake/jobs.db');
+const db = require('better-sqlite3')('data/jobs.db');
 const jobs = db.prepare(\"SELECT id, title, company, platform, location, url, score, reasoning FROM jobs WHERE status='pending' AND score >= 7 ORDER BY score DESC LIMIT 20\").all();
 console.log(JSON.stringify(jobs, null, 2));
 "`
@@ -57,17 +57,17 @@ After each reply, update the DB immediately using the correct schema:
 
 - `approve` / `yes` / `y` → set `status='applied'`:
 ```bash
-cd ~/job-search && node -e "require('better-sqlite3')('profiles/jake/jobs.db').prepare(\"UPDATE jobs SET status='applied', applied_at=COALESCE(applied_at, datetime('now')), updated_at=datetime('now') WHERE id=?\").run('JOB_ID');"
+cd ~/job-search && node -e "require('better-sqlite3')('data/jobs.db').prepare(\"UPDATE jobs SET status='applied', applied_at=COALESCE(applied_at, datetime('now')), updated_at=datetime('now') WHERE id=?\").run('JOB_ID');"
 ```
 
 - `reject` / `no` / `n` → set `status='archived'`, `stage='rejected'`:
 ```bash
-cd ~/job-search && node -e "require('better-sqlite3')('profiles/jake/jobs.db').prepare(\"UPDATE jobs SET status='archived', stage='rejected', rejected_at=datetime('now'), updated_at=datetime('now') WHERE id=?\").run('JOB_ID');"
+cd ~/job-search && node -e "require('better-sqlite3')('data/jobs.db').prepare(\"UPDATE jobs SET status='archived', stage='rejected', rejected_at=datetime('now'), updated_at=datetime('now') WHERE id=?\").run('JOB_ID');"
 ```
 
 - `archive` / `a` → set `status='archived'` (no stage, hidden from queue):
 ```bash
-cd ~/job-search && node -e "require('better-sqlite3')('profiles/jake/jobs.db').prepare(\"UPDATE jobs SET status='archived', updated_at=datetime('now') WHERE id=?\").run('JOB_ID');"
+cd ~/job-search && node -e "require('better-sqlite3')('data/jobs.db').prepare(\"UPDATE jobs SET status='archived', updated_at=datetime('now') WHERE id=?\").run('JOB_ID');"
 ```
 - `skip` / `s` → stay `pending`, move on
 - `stop` → end loop, go to Step 4
@@ -90,19 +90,19 @@ echo "Running. Check /tmp/job-search.log for progress."
 
 **"what have I applied to":**
 ```bash
-cd ~/job-search && node -e "const db=require('better-sqlite3')('profiles/jake/jobs.db');console.log(JSON.stringify(db.prepare(\"SELECT title,company,url,status,updated_at FROM jobs WHERE status IN ('applied','responded') ORDER BY updated_at DESC\").all(),null,2));"
+cd ~/job-search && node -e "const db=require('better-sqlite3')('data/jobs.db');console.log(JSON.stringify(db.prepare(\"SELECT title,company,url,status,updated_at FROM jobs WHERE status IN ('applied','responded') ORDER BY updated_at DESC\").all(),null,2));"
 ```
 
 **"mark Company as responded":** find job by company, update status to `responded`.
 
 **"show archived" / "what did I archive":**
 ```bash
-cd ~/job-search && node -e "const db=require('better-sqlite3')('profiles/jake/jobs.db');console.log(JSON.stringify(db.prepare(\"SELECT title,company,url,score,updated_at FROM jobs WHERE status='archived' ORDER BY updated_at DESC\").all(),null,2));"
+cd ~/job-search && node -e "const db=require('better-sqlite3')('data/jobs.db');console.log(JSON.stringify(db.prepare(\"SELECT title,company,url,score,updated_at FROM jobs WHERE status='archived' ORDER BY updated_at DESC\").all(),null,2));"
 ```
 
 **"unarchive Company":** find job by company, update status back to `pending`.
 
 **"reject all below 6":**
 ```bash
-cd ~/job-search && node -e "const r=require('better-sqlite3')('profiles/jake/jobs.db').prepare(\"UPDATE jobs SET status='archived', stage='rejected', rejected_at=datetime('now'), updated_at=datetime('now') WHERE status='pending' AND score < 6\").run();console.log('rejected '+r.changes);"
+cd ~/job-search && node -e "const r=require('better-sqlite3')('data/jobs.db').prepare(\"UPDATE jobs SET status='archived', stage='rejected', rejected_at=datetime('now'), updated_at=datetime('now') WHERE status='pending' AND score < 6\").run();console.log('rejected '+r.changes);"
 ```

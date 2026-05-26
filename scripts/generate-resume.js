@@ -4,7 +4,7 @@
  * Generates a resume PDF from a profile's resume.md
  *
  * Usage: node generate-resume.js
- * Output: profiles/example/resume.pdf (default), or JOB_PROFILE_DIR/resume.pdf
+ * Output: data/resume.pdf
  */
 
 'use strict';
@@ -14,7 +14,7 @@ const path = require('path');
 const puppeteer = require('puppeteer-core');
 
 const CHROME_PATH = process.env.PUPPETEER_EXECUTABLE_PATH || '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome';
-const profileDir = process.env.JOB_PROFILE_DIR || path.join(__dirname, '..', 'profiles', 'example');
+const { baseDir: profileDir } = require('../config/paths');
 const RESUME_SCALE = parseFloat(process.env.RESUME_SCALE) || 0.96;
 
 

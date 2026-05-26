@@ -14,20 +14,15 @@ STAMP="$(date +%Y%m%d-%H%M%S)"
 
 mkdir -p "$BACKUP_DIR"
 
-echo "[backup] Snapshotting SQLite databases..."
-for db in profiles/*/jobs.db; do
-  [ -f "$db" ] || continue
-  profile="$(basename "$(dirname "$db")")"
-  [ "$profile" = "example" ] && continue
-  out="$BACKUP_DIR/${profile}_jobs_${STAMP}.db"
-  sqlite3 "$db" ".backup '$out'"
+echo "[backup] Snapshotting SQLite database..."
+if [ -f "data/jobs.db" ]; then
+  out="$BACKUP_DIR/jobs_${STAMP}.db"
+  sqlite3 data/jobs.db ".backup '$out'"
   echo "  -> $out"
-done
+fi
 
-echo "[backup] Archiving profiles/ (excluding example)..."
-tar -czf "$BACKUP_DIR/profiles_${STAMP}.tar.gz" \
-  --exclude='profiles/example' \
-  profiles/
-echo "  -> $BACKUP_DIR/profiles_${STAMP}.tar.gz"
+echo "[backup] Archiving data/..."
+tar -czf "$BACKUP_DIR/data_${STAMP}.tar.gz" data/
+echo "  -> $BACKUP_DIR/data_${STAMP}.tar.gz"
 
 echo "[backup] Done. Snapshot saved to $BACKUP_DIR"

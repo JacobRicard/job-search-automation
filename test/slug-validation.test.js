@@ -30,13 +30,13 @@ module.exports = {
 `);
 
     const output = execFileSync(process.execPath, ['-e', `
-process.env.JOB_PROFILE_DIR = ${JSON.stringify(profileDir)};
+process.env.DATA_DIR = ${JSON.stringify(profileDir)};
 const { atsBatches } = require('./scripts/validate-slugs');
 console.log(JSON.stringify(Object.fromEntries(atsBatches().map(([name, items]) => [name, items.length]))));
 `], {
       cwd: repoRoot,
       encoding: 'utf8',
-      env: { ...process.env, JOB_PROFILE_DIR: profileDir },
+      env: { ...process.env, DATA_DIR: profileDir },
     });
 
     assert.deepEqual(JSON.parse(output), {

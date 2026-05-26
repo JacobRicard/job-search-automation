@@ -550,9 +550,7 @@ async function runBatch(name, items, checkFn, labelFn, options, issueBuckets, de
 // ---------------------------------------------------------------------------
 
 function activeProfileDir() {
-  return process.env.JOB_PROFILE_DIR
-    ? path.resolve(process.env.JOB_PROFILE_DIR)
-    : path.join(__dirname, '..', 'profiles', 'example');
+  return require('../config/paths').baseDir;
 }
 
 function atsBatches() {

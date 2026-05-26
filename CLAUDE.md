@@ -4,30 +4,30 @@ This repo is a personal job-search pipeline. It scrapes job boards, scores listi
 
 ## Context system
 
-`.context/` is the persistent context layer for Claude Code. It tells Claude what exists and where to find it. The source of truth for career data lives in `profiles/<active-profile>/`.
+`.context/` is the persistent context layer for Claude Code. It tells Claude what exists and where to find it. The source of truth for career data lives in `data/`.
 
-The repo ships an example copy at `.context.example/`. To use it, run:
+The repo ships example copies at `.context.example/` and `data.example/`. To use them, run:
 
 ```bash
 cp -r .context.example .context
-cp -r profiles/example profiles/your-name
+./scripts/setup.sh
 ```
 
-Then edit both to reflect you. `.context/` and profiles other than `example/` are gitignored.
+Then edit both to reflect you. `.context/` and `data/` are gitignored.
 
 **At session start, always read:**
 - `.context/people/applicant.md` — who the applicant is, working preferences
 - `.context/people/voice.md` — writing rules (critical for anything in the applicant's voice)
 
 **When working in the pipeline code, also read:**
-- `.context/projects/job-search.md` — architecture, features, multi-profile setup
+- `.context/projects/job-search.md` — architecture, features, pipeline setup
 - `.context/reference/dashboard-files.md` — file map for what to edit
 - `.context/decisions/architecture.md` — why things are built this way
 
 **When doing interview prep, outreach, or application work, also read:**
-- `profiles/<active>/context.md` — full career context, preferences, deal breakers
-- `profiles/<active>/career-detail.md` — deep project documentation with honest assessments
-- `profiles/<active>/experience/*.md` — per-company experience files
+- `data/context.md` — full career context, preferences, deal breakers
+- `data/career-detail.md` — deep project documentation with honest assessments
+- `data/experience/*.md` — per-company experience files
 - `.context/reference/interviews.md` — interview patterns and learnings
 
 **When answering application questions or writing cover letters: write the answer first, analysis after.** Don't evaluate the role or editorialize before drafting the answer. If there are concerns about fit, put them after.
@@ -48,7 +48,7 @@ The following commands are available in both Claude Code (`.claude/commands/`) a
 | `/app-questions [question text]` | Answer application form questions in the applicant's voice. |
 | `/save-context` | End of session. Persist anything learned back to `.context/`. |
 
-All commands read `JOB_PROFILE_DIR` and `JOB_DB_PATH` from `.env` to find the active profile.
+All commands read profile files from `data/` and the database from `data/jobs.db`.
 
 ## Git workflow
 
@@ -62,6 +62,6 @@ Commit message format: `<type>: <brief summary>` — types: `feat`, `fix`, `refa
 - `.env` files
 - Auto-generated build artifacts (`*.pdf`)
 - `market-research-cache.json`, `slug-health.json`, or any `*-cache.json`
-- Personal content under `.context/` or `profiles/<your-name>/` (both gitignored)
+- Personal content under `.context/` or `data/` (both gitignored)
 
 **Auto-push and PR:** A Stop hook (`.claude/hooks/auto-pr.sh`) runs at the end of every session. If the current branch has commits ahead of `main`, it pushes and opens a PR automatically — or reports the existing PR URL if one is already open. No manual `/ship` needed.

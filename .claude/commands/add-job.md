@@ -11,7 +11,7 @@ You are importing a job from LinkedIn into the jobs database. Follow these steps
 cat .env
 ```
 
-Parse `JOB_DB_PATH` and `JOB_PROFILE_DIR`. Note today's date from your context (needed to convert "X days ago" to an absolute date).
+Parse `DATA_DIR_DB` and `DATA_DIR`. Note today's date from your context (needed to convert "X days ago" to an absolute date).
 
 ## Step 1: Parse the input
 
@@ -43,7 +43,7 @@ Check for an existing record:
 
 ```bash
 node -e "
-const db = require('better-sqlite3')(process.env.JOB_DB_PATH);
+const db = require('better-sqlite3')(process.env.DATA_DIR_DB);
 const existing = db.prepare('SELECT id, title, company, status, score FROM jobs WHERE id=?').get('GENERATED_ID');
 console.log(JSON.stringify(existing || null));
 "
@@ -55,7 +55,7 @@ If a record exists, show it and ask: **keep existing** (abort), **update fields*
 
 ```bash
 node -e "
-const db = require('better-sqlite3')(process.env.JOB_DB_PATH);
+const db = require('better-sqlite3')(process.env.DATA_DIR_DB);
 const now = new Date().toISOString();
 const r = db.prepare(\`
   INSERT OR IGNORE INTO jobs
@@ -76,7 +76,7 @@ node -e "
 const job = { title: 'TITLE', company: 'COMPANY', description: \`DESCRIPTION\`, location: 'LOCATION' };
 process.stdout.write(JSON.stringify([job]));
 " | GEMINI_API_KEY=$(grep GEMINI_API_KEY .env | cut -d= -f2) \
-    JOB_PROFILE_DIR=$(grep JOB_PROFILE_DIR .env | cut -d= -f2) \
+    DATA_DIR=$(grep DATA_DIR .env | cut -d= -f2) \
     node scorer.js
 ```
 
@@ -86,7 +86,7 @@ Save the score:
 
 ```bash
 node -e "
-const db = require('better-sqlite3')(process.env.JOB_DB_PATH);
+const db = require('better-sqlite3')(process.env.DATA_DIR_DB);
 db.prepare(\"UPDATE jobs SET score=?, reasoning=?, updated_at=datetime('now') WHERE id=?\").run(SCORE, 'REASONING', 'JOB_ID');
 console.log('score saved');
 "
@@ -100,7 +100,7 @@ If `is_applied` is `true` from Step 1:
 
 ```bash
 node -e "
-const db = require('better-sqlite3')(process.env.JOB_DB_PATH);
+const db = require('better-sqlite3')(process.env.DATA_DIR_DB);
 const now = new Date().toISOString();
 db.prepare(\"UPDATE jobs SET status='applied', stage='applied', applied_at=COALESCE(applied_at,?), updated_at=datetime('now') WHERE id=?\").run(now, 'JOB_ID');
 // Write an events row so the Daily Insight modal counts this apply today

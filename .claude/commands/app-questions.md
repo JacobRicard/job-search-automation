@@ -7,13 +7,13 @@ You are answering job application questions on behalf of the applicant. Follow t
 
 ## Step 1: Load context
 
-Read `.env` to find `JOB_PROFILE_DIR`. Default: `profiles/example`.
+Read `.env` to find `DATA_DIR`. Default: `data`.
 
 Read these files in full before drafting any answer:
 - `.context/people/applicant.md` — who they are, how they work
 - `.context/people/voice.md` — writing rules (follow strictly)
-- `{JOB_PROFILE_DIR}/context.md` — full career context, preferences, deal breakers
-- `{JOB_PROFILE_DIR}/resume.md` — experience to draw specific facts from
+- `data/context.md` — full career context, preferences, deal breakers
+- `data/resume.md` — experience to draw specific facts from
 
 ## Step 2: Detect input type and parse questions
 

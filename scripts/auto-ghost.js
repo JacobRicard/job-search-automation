@@ -7,7 +7,7 @@ const logPaths = require('../lib/log-paths');
 const log = require('../lib/logger')('auto-ghost', { logFile: logPaths.daily('auto-ghost') });
 const { GHOSTED_AFTER_DAYS } = require('../config/constants');
 
-const DB_PATH = process.env.JOB_DB_PATH || path.join(__dirname, '../profiles/example/jobs.db');
+const { dbPath: DB_PATH } = require('../config/paths');
 
 function main({ dbPath = DB_PATH, database = null } = {}) {
   const db = database || new Database(dbPath);

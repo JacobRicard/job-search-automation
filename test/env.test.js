@@ -12,22 +12,22 @@ describe('env loader', () => {
   it('fills empty environment variables from the env file', () => {
     const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'env-test-'));
     const filePath = path.join(dir, '.env');
-    fs.writeFileSync(filePath, 'JOB_PROFILE_DIR=profiles/jake\nJOB_DB_PATH=profiles/jake/jobs.db\n');
+    fs.writeFileSync(filePath, 'GEMINI_API_KEY=test-key\nDASHBOARD_PORT=3131\n');
 
-    const prevProfile = process.env.JOB_PROFILE_DIR;
-    const prevDb = process.env.JOB_DB_PATH;
-    process.env.JOB_PROFILE_DIR = '';
-    process.env.JOB_DB_PATH = '';
+    const prevKey = process.env.GEMINI_API_KEY;
+    const prevPort = process.env.DASHBOARD_PORT;
+    process.env.GEMINI_API_KEY = '';
+    process.env.DASHBOARD_PORT = '';
 
     try {
       assert.equal(loadEnvFile(filePath), true);
-      assert.equal(process.env.JOB_PROFILE_DIR, 'profiles/jake');
-      assert.equal(process.env.JOB_DB_PATH, 'profiles/jake/jobs.db');
+      assert.equal(process.env.GEMINI_API_KEY, 'test-key');
+      assert.equal(process.env.DASHBOARD_PORT, '3131');
     } finally {
-      if (prevProfile == null) delete process.env.JOB_PROFILE_DIR;
-      else process.env.JOB_PROFILE_DIR = prevProfile;
-      if (prevDb == null) delete process.env.JOB_DB_PATH;
-      else process.env.JOB_DB_PATH = prevDb;
+      if (prevKey == null) delete process.env.GEMINI_API_KEY;
+      else process.env.GEMINI_API_KEY = prevKey;
+      if (prevPort == null) delete process.env.DASHBOARD_PORT;
+      else process.env.DASHBOARD_PORT = prevPort;
       fs.rmSync(dir, { recursive: true, force: true });
     }
   });

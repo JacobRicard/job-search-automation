@@ -4,7 +4,8 @@ services:
     ports:
       - "${DASHBOARD_PORT:-3131}:${DASHBOARD_PORT:-3131}"
     volumes:
-      - ./profiles:/app/profiles
+      - ./data:/app/data
+      - ./.env:/app/.env
     env_file: .env
     restart: unless-stopped
     healthcheck:
@@ -23,7 +24,7 @@ services:
   worker:
     build: .
     volumes:
-      - ./profiles:/app/profiles
+      - ./data:/app/data
     env_file: .env
     depends_on:
       dashboard:

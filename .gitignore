@@ -21,13 +21,11 @@ jobs.db
 *.pdf
 jobs.json
 transcript.md
-profiles/*/jobs.json
 public/bookmarklet.js
 
-# Personal context and per-user profile (copy .context.example and profiles/example to set up your own)
+# Personal data directory (copy data.example to data to set up)
 /.context/
-/profiles/*/
-!/profiles/example/
+/data/
 
 # Local backups (from scripts/backup.sh)
 /backups/

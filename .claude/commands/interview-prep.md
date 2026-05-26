@@ -11,13 +11,13 @@ Read `$ARGUMENTS`. It may be a pasted job description, a recruiter email, or jus
 
 ## Step 2: Resolve profile
 
-Read `.env` to find `JOB_DB_PATH` and `JOB_PROFILE_DIR`.
+Read `.env` to find `DATA_DIR_DB` and `DATA_DIR`.
 
 ## Step 3: Find the job in the DB
 
 ```bash
 node -e "
-const db = require('better-sqlite3')(process.env.JOB_DB_PATH || 'profiles/example/jobs.db');
+const db = require('better-sqlite3')(process.env.DATA_DIR_DB || 'data/jobs.db');
 const jobs = db.prepare(\"SELECT id, title, company, score, stage, status FROM jobs WHERE status NOT IN ('archived', 'rejected') ORDER BY score DESC\").all();
 console.log(JSON.stringify(jobs, null, 2));
 "
@@ -29,7 +29,7 @@ Get the full record:
 
 ```bash
 node -e "
-const db = require('better-sqlite3')(process.env.JOB_DB_PATH || 'profiles/example/jobs.db');
+const db = require('better-sqlite3')(process.env.DATA_DIR_DB || 'data/jobs.db');
 const job = db.prepare(\"SELECT id, title, company, description, reasoning, stage FROM jobs WHERE id=?\").get('MATCHED_ID');
 console.log(JSON.stringify(job, null, 2));
 "
@@ -39,8 +39,8 @@ console.log(JSON.stringify(job, null, 2));
 
 Read all of these before generating any output:
 
-- `{JOB_PROFILE_DIR}/resume.md` — specific numbers and company names to pull from
-- `{JOB_PROFILE_DIR}/career-detail.md` — honest account of what was actually built at each job
+- `data/resume.md` — specific numbers and company names to pull from
+- `data/career-detail.md` — honest account of what was actually built at each job
 - `.context/people/applicant.md` — background, working style, preferences
 - `.context/people/voice.md` — writing rules (critical — read this carefully)
 
@@ -119,7 +119,7 @@ Write the full output to `/tmp/interview_notes.txt`, then:
 python3 -c "
 import sqlite3, os
 notes = open('/tmp/interview_notes.txt').read()
-db_path = os.environ.get('JOB_DB_PATH', 'profiles/example/jobs.db')
+db_path = os.environ.get('DATA_DIR_DB', 'data/jobs.db')
 db = sqlite3.connect(db_path)
 db.execute(\"UPDATE jobs SET interview_notes=?, updated_at=datetime('now') WHERE id=?\", (notes, 'MATCHED_ID'))
 db.commit()

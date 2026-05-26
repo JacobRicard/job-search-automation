@@ -4,7 +4,7 @@
 /**
  * Uses Gemini to suggest new tech companies in the DevOps/SRE space, verifies
  * each company has an active ATS board, then appends verified companies to
- * profiles/<active>/suggested-companies.json so they're scraped on the next run.
+ * data/suggested-companies.json so they're scraped on the next run.
  */
 
 const fs   = require('fs');
@@ -28,9 +28,7 @@ const DEFAULT_DISCOVER_TTL_HOURS = 6;
 const DEFAULT_DISCOVER_CANDIDATE_COUNT = 50;
 const MIN_DISCOVER_OUTPUT_TOKENS = 2000;
 
-const profileDir = process.env.JOB_PROFILE_DIR
-  ? path.resolve(repoRoot, process.env.JOB_PROFILE_DIR)
-  : path.join(repoRoot, 'profiles', 'example');
+const { baseDir: profileDir } = require('../config/paths');
 
 const log = createLogger('discover-companies', { logFile: logPaths.daily('discover-companies') });
 

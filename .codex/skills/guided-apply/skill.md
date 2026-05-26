@@ -9,7 +9,7 @@ This is an alias for `.codex/skills/apply/SKILL.md`.
 
 Use the apply skill's prep-only workflow:
 
-- load `.env`, `JOB_DB_PATH`, and `JOB_PROFILE_DIR`
+- load `.env`, `DATA_DIR_DB`, and `DATA_DIR`
 - extract ATS questions through `prepareApplication(db, job, { force: false, extractQuestions: true })`
 - save and review `application_preps`
 - leave unresolved or low-confidence fields for manual review

@@ -29,27 +29,11 @@ function parseArgs(argv) {
 function loadActiveProfileEnv(repoRoot) {
   loadDashboardEnv(repoRoot);
 
-  const profileDir = process.env.JOB_PROFILE_DIR
-    ? path.resolve(repoRoot, process.env.JOB_PROFILE_DIR)
-    : path.join(repoRoot, 'profiles', 'example');
-
-  loadEnvFile(path.join(profileDir, '.env'));
-
-  if (!process.env.JOB_PROFILE_DIR) {
-    process.env.JOB_PROFILE_DIR = profileDir;
-  } else {
-    process.env.JOB_PROFILE_DIR = path.resolve(repoRoot, process.env.JOB_PROFILE_DIR);
-  }
-
-  if (!process.env.JOB_DB_PATH) {
-    process.env.JOB_DB_PATH = path.join(process.env.JOB_PROFILE_DIR, 'jobs.db');
-  } else if (!path.isAbsolute(process.env.JOB_DB_PATH)) {
-    process.env.JOB_DB_PATH = path.resolve(repoRoot, process.env.JOB_DB_PATH);
-  }
+  const { baseDir: profileDir, dbPath } = require('../config/paths');
 
   return {
-    profileDir: process.env.JOB_PROFILE_DIR,
-    dbPath: process.env.JOB_DB_PATH,
+    profileDir,
+    dbPath,
   };
 }
 

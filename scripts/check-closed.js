@@ -21,7 +21,7 @@ const { logEvent } = require('../lib/db');
 const logPaths = require('../lib/log-paths');
 const log = require('../lib/logger')('check-closed', { logFile: logPaths.daily('check-closed') });
 
-const DB_PATH = process.env.JOB_DB_PATH || path.join(__dirname, '../profiles/example/jobs.db');
+const { dbPath: DB_PATH } = require('../config/paths');
 
 const DELAY_MS = 300; // between API calls
 

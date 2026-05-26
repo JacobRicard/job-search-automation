@@ -11,11 +11,11 @@ You are the job applier. Claude generates every answer from Jake's profile at ru
 cat .env
 ```
 
-Parse `JOB_DB_PATH` and `JOB_PROFILE_DIR` from the output. Then read these files (they are your source of truth for generating answers):
+Parse `DATA_DIR_DB` and `DATA_DIR` from the output. Then read these files (they are your source of truth for generating answers):
 
-- `{JOB_PROFILE_DIR}/context.md` — career summary, preferences, deal-breakers
-- `{JOB_PROFILE_DIR}/career-detail.md` — deep project docs with honest assessments
-- `{JOB_PROFILE_DIR}/resume.md` — base resume content
+- `data/context.md` — career summary, preferences, deal-breakers
+- `data/career-detail.md` — deep project docs with honest assessments
+- `data/resume.md` — base resume content
 - `.context/people/voice.md` — writing rules (critical — internalize before generating any text)
 
 ## Step 1: Pick a job
@@ -23,7 +23,7 @@ Parse `JOB_DB_PATH` and `JOB_PROFILE_DIR` from the output. Then read these files
 **If a job ID or company name was provided**, find it:
 ```bash
 node -e "
-const db = require('better-sqlite3')(process.env.JOB_DB_PATH);
+const db = require('better-sqlite3')(process.env.DATA_DIR_DB);
 const jobs = db.prepare(\"SELECT id, title, company, platform, url, score, status, description FROM jobs WHERE LOWER(id) LIKE ? OR LOWER(company) LIKE ? ORDER BY score DESC LIMIT 5\").all('%ARG%', '%ARG%');
 console.log(JSON.stringify(jobs, null, 2));
 "
@@ -32,7 +32,7 @@ console.log(JSON.stringify(jobs, null, 2));
 **If no job was provided**, show pending ATS-supported jobs:
 ```bash
 node -e "
-const db = require('better-sqlite3')(process.env.JOB_DB_PATH);
+const db = require('better-sqlite3')(process.env.DATA_DIR_DB);
 const jobs = db.prepare(\"SELECT id, title, company, platform, score, url FROM jobs WHERE status='pending' AND platform IN ('greenhouse','lever','ashby') AND score >= 7 ORDER BY score DESC LIMIT 10\").all();
 console.log(JSON.stringify(jobs, null, 2));
 "
@@ -44,7 +44,7 @@ Present jobs clearly and ask the user which one to apply to. Note the job `id` �
 
 ```bash
 node -e "
-const db = require('better-sqlite3')(process.env.JOB_DB_PATH);
+const db = require('better-sqlite3')(process.env.DATA_DIR_DB);
 const job = db.prepare('SELECT * FROM jobs WHERE id = ?').get('JOB_ID');
 console.log(JSON.stringify(job, null, 2));
 "
@@ -124,13 +124,13 @@ If the user wants changes, revise inline, re-run the voice check, and show the u
 Once the user approves, write the answers to the override JSON file. The directory should already exist; create it if needed:
 
 ```bash
-mkdir -p {JOB_PROFILE_DIR}/auto-apply-overrides
+mkdir -p data/auto-apply-overrides
 ```
 
 Write the file:
 
 ```bash
-cat > {JOB_PROFILE_DIR}/auto-apply-overrides/JOB_ID.json << 'OVERRIDE_EOF'
+cat > data/auto-apply-overrides/JOB_ID.json << 'OVERRIDE_EOF'
 {
   "jobId": "JOB_ID",
   "company": "COMPANY",
@@ -170,7 +170,7 @@ When the user says they've submitted (says "done", "submitted", "applied", etc.)
 
 ```bash
 node -e "
-const db = require('better-sqlite3')(process.env.JOB_DB_PATH);
+const db = require('better-sqlite3')(process.env.DATA_DIR_DB);
 const now = new Date().toISOString();
 const r = db.prepare(\"UPDATE jobs SET status='applied', stage='applied', applied_at=COALESCE(applied_at,?), updated_at=datetime('now') WHERE id=?\").run(now, 'JOB_ID');
 console.log(r.changes ? 'Marked as applied.' : 'No rows updated — check the job ID.');

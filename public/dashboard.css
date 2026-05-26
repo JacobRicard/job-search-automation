@@ -1397,6 +1397,105 @@ td {
   justify-content: flex-end;
 }
 
+/* ── Onboarding wizard ────────────────────────────────────────────── */
+
+.wizard-progress {
+  display: flex;
+  gap: 6px;
+  justify-content: center;
+  margin-bottom: 24px;
+}
+
+.wizard-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--border);
+  transition: background 0.2s, transform 0.2s;
+}
+
+.wizard-dot.active {
+  background: var(--accent);
+  transform: scale(1.25);
+}
+
+.wizard-dot.done {
+  background: var(--accent);
+  opacity: 0.4;
+}
+
+.wizard-step { display: none; }
+.wizard-step.active { display: block; }
+
+.wizard-list {
+  list-style: none;
+  margin: 12px 0 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.wizard-list li {
+  padding: 10px 14px;
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  font-size: 0.84rem;
+  color: var(--text-secondary);
+  line-height: 1.4;
+}
+
+.wizard-list li::before {
+  content: '✓ ';
+  color: var(--green);
+  font-weight: 700;
+}
+
+.wizard-note {
+  font-size: 0.78rem;
+  color: var(--text-muted);
+  margin-top: 12px;
+  line-height: 1.5;
+}
+
+.wizard-note a { color: var(--accent); }
+
+.wizard-field-group {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+}
+
+.wizard-field-group label { margin-top: 12px; }
+.wizard-field-group label:first-child { margin-top: 0; }
+
+.wizard-field-hint {
+  font-size: 0.72rem;
+  color: var(--text-dim);
+  font-weight: 400;
+}
+
+.wizard-modal textarea {
+  width: 100%;
+  padding: 10px 14px;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border);
+  background: var(--bg-primary);
+  color: var(--text-secondary);
+  font-size: 0.85rem;
+  font-family: inherit;
+  resize: vertical;
+  margin-bottom: 0;
+  transition: border-color 0.2s, box-shadow 0.2s;
+  line-height: 1.5;
+}
+
+.wizard-modal textarea:focus {
+  outline: none;
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px var(--accent-glow);
+}
+
 .modal-tabs {
   display: flex;
   gap: 4px;

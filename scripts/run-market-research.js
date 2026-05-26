@@ -5,7 +5,7 @@
  * Reads jobs from DB, calls Gemini, writes market-research-cache.json.
  * Skips if cache is less than 23 hours old.
  *
- * Uses JOB_PROFILE_DIR and JOB_DB_PATH env vars (same as other pipeline scripts).
+ * Reads profile data from the data/ directory.
  */
 
 const fs = require('fs');
@@ -17,8 +17,7 @@ const { getLiveMarketResearchJobs } = require('../lib/market-jobs');
 const logPaths = require('../lib/log-paths');
 const log = require('../lib/logger')('market-research', { logFile: logPaths.daily('market-research') });
 
-const PROFILE_DIR = process.env.JOB_PROFILE_DIR || path.join(__dirname, '..', 'profiles', 'example');
-const DB_PATH = process.env.JOB_DB_PATH || path.join(PROFILE_DIR, 'jobs.db');
+const { baseDir: PROFILE_DIR, dbPath: DB_PATH } = require('../config/paths');
 const CACHE_PATH = path.join(PROFILE_DIR, 'market-research-cache.json');
 const RESUME_PATH = path.join(PROFILE_DIR, 'resume.md');
 const CACHE_TTL_MS = 23 * 60 * 60 * 1000;

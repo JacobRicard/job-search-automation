@@ -40,13 +40,8 @@ echo "[backup] Syncing to $DEST..."
 # .context/ (all context files)
 rsync -a --delete .context/ "$DEST/.context/"
 
-# profiles/ (all profiles except example)
-mkdir -p "$DEST/profiles"
-for profile_dir in profiles/*/; do
-  profile=$(basename "$profile_dir")
-  [ "$profile" = "example" ] && continue
-  rsync -a --delete "$profile_dir" "$DEST/profiles/$profile/"
-done
+# data/ directory
+rsync -a --delete data/ "$DEST/data/"
 
 # root .env
 cp .env "$DEST/.env"
