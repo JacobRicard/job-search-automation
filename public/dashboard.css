@@ -1209,8 +1209,6 @@ td {
 }
 
 .job-badges > .complexity-badge,
-.job-badges > .badge-ai,
-.job-badges > .badge-std,
 .job-badges > .badge-salary,
 .job-badges > .badge-ats {
   flex-shrink: 0;
@@ -1264,37 +1262,12 @@ td {
 .btn-purple { background: var(--purple); color: white; }
 .btn-outreach-done { background: var(--green); color: white; }
 
-.complexity-badge.resume-ai {
-  background: rgba(168, 85, 247, 0.12);
-  color: var(--purple);
-  border: 1px solid rgba(168, 85, 247, 0.25);
-}
-
 .complexity-badge.resume-std {
   background: rgba(100, 116, 139, 0.1);
   color: var(--text-muted);
   border: 1px solid rgba(100, 116, 139, 0.2);
 }
 
-/* ── Text-pill resume badges (replaces emoji) ────────────────────── */
-
-.badge-ai,
-.badge-std {
-  display: inline-flex;
-  align-items: center;
-  font-size: 9px;
-  font-weight: 700;
-  letter-spacing: 0.06em;
-  padding: 1px 5px;
-  border-radius: 3px;
-  background: rgba(139, 92, 246, 0.18);
-  color: #c4b5fd;
-  border: 1px solid rgba(196, 181, 253, 0.2);
-  flex-shrink: 0;
-  margin-left: 4px;
-  vertical-align: middle;
-  text-transform: uppercase;
-}
 .btn-apply { background: var(--amber); color: white; text-decoration: none; display: inline-block; }
 .btn-archive { background: var(--bg-primary); color: var(--text-dim); border: 1px solid var(--border); }
 .btn-archive:hover { border-color: var(--border-hover); color: var(--text-muted); }
@@ -2407,8 +2380,6 @@ td {
   }
 
   .job-badges > .complexity-badge,
-  .job-badges > .badge-ai,
-  .job-badges > .badge-std,
   .job-badges > .badge-salary,
   .job-badges > .badge-ats {
     margin-top: 2px;

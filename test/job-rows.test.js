@@ -77,7 +77,7 @@ describe('renderJobTable', () => {
         stage: '',
         score: 8,
       },
-    ], {}, {}, 'all', 'score', '', null);
+    ], {}, {}, 'all', 'score', null);
 
     assert.match(html, /<div class="job-title"><a href="https:\/\/example\.com\/jobs\/linked" target="_blank" rel="noreferrer">Platform Engineer<\/a><\/div>/);
   });
@@ -95,7 +95,7 @@ describe('renderJobTable', () => {
         stage: 'applied',
         score: 9,
       },
-    ], {}, {}, 'applied', 'score', '', null);
+    ], {}, {}, 'applied', 'score', null);
 
     assert.doesNotMatch(html, /href=""/);
     assert.doesNotMatch(html, /<div class="job-title"><a /);
@@ -118,7 +118,7 @@ describe('renderJobTable', () => {
         score: 9,
         apply_complexity: 'complex',
       },
-    ], {}, { acme: ['zeta', 'agency', 'alpha'] }, 'applied', 'score', '', null);
+    ], {}, { acme: ['zeta', 'agency', 'alpha'] }, 'applied', 'score', null);
 
     assert.match(html, /class="job-badges"/);
     assert.match(html, /Applied 2026-04-14/);
@@ -150,7 +150,7 @@ describe('renderJobTable', () => {
         posted_at: '2026-04-14',
         score: 8,
       },
-    ], {}, {}, 'all', 'score', '1', {
+    ], {}, {}, 'all', 'score', {
       page: 2,
       totalPages: 3,
       startItem: 26,
@@ -161,9 +161,9 @@ describe('renderJobTable', () => {
       minScore: 8,
     });
 
-    assert.match(html, /href="\/\?filter=all&sort=score&level=1&q=platform\+aws&minScore=8"/);
-    assert.match(html, /href="\/\?filter=all&sort=score&level=1&q=platform\+aws&minScore=8&page=3"/);
-    assert.match(html, /onclick="location='\/\?filter=all&sort=date&level=1&q=platform\+aws&minScore=8'"/);
+    assert.match(html, /href="\/\?filter=all&sort=score&q=platform\+aws&minScore=8"/);
+    assert.match(html, /href="\/\?filter=all&sort=score&q=platform\+aws&minScore=8&page=3"/);
+    assert.match(html, /onclick="location='\/\?filter=all&sort=date&q=platform\+aws&minScore=8'"/);
   });
 
   it('uses rejected date as the rejected view date column', () => {
@@ -182,7 +182,7 @@ describe('renderJobTable', () => {
         posted_at: '2026-03-01',
         score: 7,
       },
-    ], {}, {}, 'rejected', 'date', '', null);
+    ], {}, {}, 'rejected', 'date', null);
 
     assert.match(html, /Date Rejected/);
     assert.match(html, /<div class="job-col-date">Apr 28<\/div>/);
@@ -216,7 +216,7 @@ describe('renderJobTable', () => {
         score: 8,
         apply_complexity: null,
       },
-    ], {}, {}, 'not-applied', 'score', '', null);
+    ], {}, {}, 'not-applied', 'score', null);
 
     assert.doesNotMatch(html, /autox/);
     assert.doesNotMatch(html, />simple</);

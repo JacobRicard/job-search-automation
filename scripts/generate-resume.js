@@ -17,14 +17,6 @@ const CHROME_PATH = process.env.PUPPETEER_EXECUTABLE_PATH || '/Applications/Goog
 const profileDir = process.env.JOB_PROFILE_DIR || path.join(__dirname, '..', 'profiles', 'example');
 const RESUME_SCALE = parseFloat(process.env.RESUME_SCALE) || 0.96;
 
-function resumeVariantsForProfile(dir = profileDir) {
-  return [
-    ['resume.md',       'resume.pdf'],
-    ['resume-devops.md','resume-devops.pdf'],
-    ['resume-ai.md',    'resume-ai.pdf'],
-  ].map(([md, pdf]) => [path.join(dir, md), path.join(dir, pdf)])
-   .filter(([md]) => fs.existsSync(md));
-}
 
 function loadProfileCss(dir = profileDir) {
   const profileCssPath = path.join(dir, 'resume.css');
@@ -337,24 +329,24 @@ async function main() {
     args: ['--no-sandbox', '--disable-setuid-sandbox'],
   });
 
+  const RESUME_PATH = path.join(profileDir, 'resume.md');
+  const OUTPUT_PATH = path.join(profileDir, 'resume.pdf');
   try {
     const profileCss = loadProfileCss(profileDir);
-    for (const [RESUME_PATH, OUTPUT_PATH] of resumeVariantsForProfile(profileDir)) {
-      const md = fs.readFileSync(RESUME_PATH, 'utf8');
-      const resume = parseResume(md);
-      const html = buildHtml(resume, profileCss);
+    const md = fs.readFileSync(RESUME_PATH, 'utf8');
+    const resume = parseResume(md);
+    const html = buildHtml(resume, profileCss);
 
-      const page = await browser.newPage();
-      await page.setContent(html, { waitUntil: 'networkidle0' });
-      await page.pdf({
-        path: OUTPUT_PATH,
-        format: 'Letter',
-        printBackground: false,
-        scale: RESUME_SCALE,
-      });
-      await page.close();
-      console.log(`PDF generated: ${OUTPUT_PATH}`);
-    }
+    const page = await browser.newPage();
+    await page.setContent(html, { waitUntil: 'networkidle0' });
+    await page.pdf({
+      path: OUTPUT_PATH,
+      format: 'Letter',
+      printBackground: false,
+      scale: RESUME_SCALE,
+    });
+    await page.close();
+    console.log(`PDF generated: ${OUTPUT_PATH}`);
   } finally {
     await browser.close();
   }
@@ -398,6 +390,5 @@ module.exports = {
   loadProfileCss,
   parseResume,
   renderResumeMarkdownToHtml,
-  resumeVariantsForProfile,
   writeResumePdf,
 };

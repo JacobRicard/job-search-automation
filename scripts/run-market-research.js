@@ -20,7 +20,7 @@ const log = require('../lib/logger')('market-research', { logFile: logPaths.dail
 const PROFILE_DIR = process.env.JOB_PROFILE_DIR || path.join(__dirname, '..', 'profiles', 'example');
 const DB_PATH = process.env.JOB_DB_PATH || path.join(PROFILE_DIR, 'jobs.db');
 const CACHE_PATH = path.join(PROFILE_DIR, 'market-research-cache.json');
-const RESUME_PATH = path.join(PROFILE_DIR, 'resume-ai.md');
+const RESUME_PATH = path.join(PROFILE_DIR, 'resume.md');
 const CACHE_TTL_MS = 23 * 60 * 60 * 1000;
 
 function loadCache() {
