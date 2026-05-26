@@ -39,7 +39,11 @@ function applyLocationPrefs() {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(prefs),
-  }).then(() => window.location.reload());
+  }).then(() => {
+    const url = new URL(window.location.href);
+    url.searchParams.delete('page');
+    window.location.href = url.toString();
+  });
 }
 
 // ── Job action menus ─────────────────────────────────────────────────
