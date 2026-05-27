@@ -10,18 +10,25 @@ const assert = require('node:assert/strict');
 const { matchesSearchTerms } = require('../lib/scraper-utils');
 
 describe('matchesSearchTerms', () => {
+  const searchTerms = [
+    'devops',
+    'sre',
+    'platform engineer',
+    'cloud engineer',
+  ];
+
   it('matches devops titles', () => {
-    assert.ok(matchesSearchTerms('Senior DevOps Engineer'));
-    assert.ok(matchesSearchTerms('SRE Lead'));
-    assert.ok(matchesSearchTerms('Platform Engineer II'));
-    assert.ok(matchesSearchTerms('Cloud Engineer'));
+    assert.ok(matchesSearchTerms('Senior DevOps Engineer', searchTerms));
+    assert.ok(matchesSearchTerms('SRE Lead', searchTerms));
+    assert.ok(matchesSearchTerms('Platform Engineer II', searchTerms));
+    assert.ok(matchesSearchTerms('Cloud Engineer', searchTerms));
   });
 
   it('rejects non-matching titles', () => {
-    assert.ok(!matchesSearchTerms('Product Manager'));
-    assert.ok(!matchesSearchTerms('Frontend Developer'));
-    assert.ok(!matchesSearchTerms(''));
-    assert.ok(!matchesSearchTerms(null));
+    assert.ok(!matchesSearchTerms('Product Manager', searchTerms));
+    assert.ok(!matchesSearchTerms('Frontend Developer', searchTerms));
+    assert.ok(!matchesSearchTerms('', searchTerms));
+    assert.ok(!matchesSearchTerms(null, searchTerms));
   });
 });
 
