@@ -250,8 +250,10 @@ describe('setup HTTP handlers', () => {
     port = server.address().port;
   });
 
-  after(() => {
-    server.close();
+  after(async () => {
+    await new Promise((resolve, reject) => {
+      server.close((err) => err ? reject(err) : resolve());
+    });
     rmDir(tmpDir);
     if (savedKey === undefined) delete process.env.GEMINI_API_KEY;
     else process.env.GEMINI_API_KEY = savedKey;
