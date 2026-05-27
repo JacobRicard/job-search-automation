@@ -56,6 +56,7 @@ async function scrapeWWR() {
         scrapedTimestamp: new Date().toISOString(),
         description: stripHtml(desc).slice(0, MAX_DESCRIPTION_LENGTH),
         location: region || 'Remote',
+        postedAt: pubDate ? new Date(pubDate).toISOString().slice(0, 10) : '',
       }));
     }
 

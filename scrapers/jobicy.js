@@ -29,6 +29,7 @@ async function scrapeJobicy() {
       scrapedTimestamp: new Date().toISOString(),
       description: stripHtml(job.description || ''),
       location: job.candidate_required_location || 'Remote',
+      postedAt: job.publication_date || '',
     }));
   }
 

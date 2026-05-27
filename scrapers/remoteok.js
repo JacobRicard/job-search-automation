@@ -35,6 +35,7 @@ async function scrapeRemoteOK() {
       scrapedTimestamp: new Date().toISOString(),
       description: stripHtml(job.description || ''),
       location: job.location || 'Remote',
+      postedAt: job.epoch ? new Date(job.epoch * 1000).toISOString().slice(0, 10) : '',
     }));
   }
 

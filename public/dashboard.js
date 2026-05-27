@@ -334,15 +334,7 @@ var _wizardStep = 0;
   if (!window.__FIRST_RUN__) return;
   if (localStorage.getItem('jsa_setup_done')) return;
 
-  fetch('/api/setup/status')
-    .then(function(r) { return r.json(); })
-    .then(function(data) {
-      if (data.resumeContent) {
-        var el = document.getElementById('wizard-resume');
-        if (el) el.value = data.resumeContent;
-      }
-    })
-    .catch(function() {});
+  fetch('/api/setup/status').catch(function() {});
 
   var overlay = document.getElementById('onboarding-wizard');
   if (overlay) overlay.classList.add('open');
@@ -351,6 +343,7 @@ var _wizardStep = 0;
 function wizardGoTo(step) {
   var steps = document.querySelectorAll('.wizard-step');
   var dots = document.querySelectorAll('.wizard-dot');
+  var totalSteps = steps.length;
   steps.forEach(function(el, i) {
     el.classList.toggle('active', i === step);
   });
@@ -359,6 +352,24 @@ function wizardGoTo(step) {
     el.classList.toggle('done', i < step);
   });
   _wizardStep = step;
+  // Kick off pipeline when reaching the Done step (last step)
+  if (step === totalSteps - 1) {
+    wizardKickoffPipeline();
+  }
+}
+
+function wizardKickoffPipeline() {
+  var icon = document.getElementById('wizard-pipeline-icon');
+  var msg = document.getElementById('wizard-pipeline-msg');
+  fetch('/pipeline', { method: 'POST' })
+    .then(function() {
+      if (icon) icon.textContent = '✅';
+      if (msg) { msg.textContent = 'Job search is running. Check the Pending tab in a few minutes.'; msg.style.color = 'var(--text-primary)'; }
+    })
+    .catch(function() {
+      if (icon) icon.textContent = '⚠️';
+      if (msg) msg.textContent = 'Could not start pipeline. Run it manually from the dashboard.';
+    });
 }
 
 function wizardNext() { wizardGoTo(_wizardStep + 1); }
@@ -410,16 +421,95 @@ function wizardSaveKey() {
     });
 }
 
+function wizardResumeFileChanged() {
+  var input = document.getElementById('wizard-resume-file');
+  var label = document.getElementById('wizard-resume-filename');
+  var status = document.getElementById('wizard-resume-status');
+  if (input && input.files && input.files[0]) {
+    if (label) label.textContent = input.files[0].name;
+    if (status) status.textContent = '';
+  }
+}
+
 function wizardSaveResume() {
-  var content = (document.getElementById('wizard-resume') || {}).value || '';
-  if (!content.trim()) { wizardNext(); return; }
-  fetch('/api/setup/resume', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ content: content }),
-  })
-    .catch(function() {})
-    .finally(function() { wizardNext(); });
+  var input = document.getElementById('wizard-resume-file');
+  var status = document.getElementById('wizard-resume-status');
+  var saveBtn = document.getElementById('wizard-resume-save-btn');
+  var file = input && input.files && input.files[0];
+  if (!file) { wizardNext(); return; }
+
+  if (saveBtn) saveBtn.disabled = true;
+  if (status) { status.textContent = 'Uploading...'; status.style.color = 'var(--text-muted)'; }
+
+  var isPdf = file.name.toLowerCase().endsWith('.pdf');
+
+  if (isPdf) {
+    var reader = new FileReader();
+    reader.onload = function(e) {
+      var base64 = btoa(String.fromCharCode.apply(null, new Uint8Array(e.target.result)));
+      fetch('/api/setup/resume', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ content: base64, format: 'pdf' }),
+      })
+        .then(function(r) { return r.json(); })
+        .then(function(data) {
+          if (!data.ok && data.error === 'no_key') {
+            if (status) { status.textContent = 'Enter your Gemini API key in step 1 to upload PDFs, or upload a .txt file.'; status.style.color = 'var(--red)'; }
+            if (saveBtn) saveBtn.disabled = false;
+            return;
+          }
+          if (!data.ok) {
+            if (status) { status.textContent = 'Upload failed. Try a .txt file instead.'; status.style.color = 'var(--red)'; }
+            if (saveBtn) saveBtn.disabled = false;
+            return;
+          }
+          if (saveBtn) saveBtn.disabled = false;
+          wizardNext();
+          wizardAutoFillTargets();
+        })
+        .catch(function() {
+          if (status) { status.textContent = 'Upload failed.'; status.style.color = 'var(--red)'; }
+          if (saveBtn) saveBtn.disabled = false;
+        });
+    };
+    reader.readAsArrayBuffer(file);
+  } else {
+    var reader = new FileReader();
+    reader.onload = function(e) {
+      fetch('/api/setup/resume', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ content: e.target.result }),
+      })
+        .catch(function() {})
+        .finally(function() {
+          if (saveBtn) saveBtn.disabled = false;
+          wizardNext();
+          wizardAutoFillTargets();
+        });
+    };
+    reader.readAsText(file);
+  }
+}
+
+function wizardAutoFillTargets() {
+  var autofillStatus = document.getElementById('wizard-autofill-status');
+  if (autofillStatus) { autofillStatus.textContent = 'Analyzing resume...'; autofillStatus.style.color = 'var(--text-muted)'; }
+  fetch('/api/setup/extract-profile', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{}' })
+    .then(function(r) { return r.json(); })
+    .then(function(data) {
+      if (data.ok && (data.titles || data.stack)) {
+        if (data.titles) { var el = document.getElementById('wizard-titles'); if (el) el.value = data.titles; }
+        if (data.stack)  { var el = document.getElementById('wizard-stack');  if (el) el.value = data.stack;  }
+        if (autofillStatus) { autofillStatus.textContent = 'Auto-filled from your resume. Edit as needed.'; autofillStatus.style.color = 'var(--green)'; }
+      } else {
+        if (autofillStatus) { autofillStatus.textContent = ''; }
+      }
+    })
+    .catch(function() {
+      if (autofillStatus) { autofillStatus.textContent = ''; }
+    });
 }
 
 function wizardSaveProfile() {
@@ -451,7 +541,7 @@ function wizardDone() {
   localStorage.setItem('jsa_setup_done', '1');
   var overlay = document.getElementById('onboarding-wizard');
   if (overlay) overlay.classList.remove('open');
-  showToast('Profile saved. First jobs will appear soon.', '#22c55e');
+  showToast('Searching for jobs now. Check Pending in a few minutes.', '#22c55e');
 }
 
 // ---------------------------------------------------------------------------

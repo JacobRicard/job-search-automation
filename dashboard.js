@@ -55,6 +55,7 @@ const {
   handleSetupCompanies,
   handleSetupApiKey,
   handleSetupTestKey,
+  handleExtractProfile,
 } = createSetupHandlers({ profileDir: PROFILE_DIR, envPath: ENV_PATH });
 
 // ---------------------------------------------------------------------------
@@ -102,6 +103,7 @@ const routes = {
   'POST /api/setup/companies': handleSetupCompanies,
   'POST /api/setup/api-key': handleSetupApiKey,
   'POST /api/setup/test-key': handleSetupTestKey,
+  'POST /api/setup/extract-profile': handleExtractProfile,
   'GET /help':               handleHelpPage,
   'GET /':                   handleDashboardPage,
 };

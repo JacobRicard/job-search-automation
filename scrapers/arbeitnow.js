@@ -34,6 +34,7 @@ async function scrapeArbeitnow() {
       scrapedTimestamp: new Date().toISOString(),
       description: stripHtml(job.description || ''),
       location,
+      postedAt: job.created_at || '',
     }));
   }
 

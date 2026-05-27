@@ -32,6 +32,7 @@ async function scrapeAshby() {
         scrapedTimestamp: new Date().toISOString(),
         description,
         location,
+        postedAt: job.updatedAt || job.publishedAt || '',
       });
     },
   });

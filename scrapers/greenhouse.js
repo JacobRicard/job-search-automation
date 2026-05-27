@@ -25,6 +25,7 @@ async function scrapeGreenhouse() {
         scrapedTimestamp: new Date().toISOString(),
         description: stripHtml(job.content || ''),
         location,
+        postedAt: job.updated_at || '',
       });
     },
   });

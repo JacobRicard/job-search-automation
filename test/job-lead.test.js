@@ -21,6 +21,7 @@ describe('JobLead contract helpers', () => {
       ...lead,
       direct_apply_url: 'https://job-boards.greenhouse.io/acme/jobs/12345?gh_src=test#section',
       location: '',
+      posted_at: '',
     });
   });
 

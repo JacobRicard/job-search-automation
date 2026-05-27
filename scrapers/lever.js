@@ -34,6 +34,7 @@ async function scrapeLever() {
         scrapedTimestamp: new Date().toISOString(),
         description: parts.filter(Boolean).join('\n\n'),
         location,
+        postedAt: job.createdAt ? new Date(job.createdAt).toISOString().slice(0, 10) : '',
       });
     },
   });

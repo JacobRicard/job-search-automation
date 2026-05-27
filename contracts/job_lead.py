@@ -22,6 +22,7 @@ class JobLead(BaseModel):
     ats_platform_name: StrictStr
     scraped_timestamp: datetime
     location: StrictStr = ""
+    posted_at: StrictStr = ""
 
     @field_validator("title", "company", "description", "direct_apply_url", "ats_platform_name")
     @classmethod
