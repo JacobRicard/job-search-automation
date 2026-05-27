@@ -18,7 +18,7 @@ Final "applied" status is always set by you. The scraper never marks anything as
 
 ## Quickstart
 
-The only requirement is **Docker Desktop** (Compose v2). No Node, no Python.
+The only requirement is **Docker Desktop** (Compose v2).
 
 ```bash
 git clone https://github.com/jakemercure28/job-search-automation.git
