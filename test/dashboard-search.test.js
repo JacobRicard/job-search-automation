@@ -5,6 +5,8 @@ const assert = require('node:assert/strict');
 
 const {
   normalizeDashboardSearchOptions,
+  normalizeDashboardPage,
+  normalizeDashboardViewOptions,
   parseDashboardSearchOptions,
   jobMatchesSearch,
   applyDashboardSearch,
@@ -26,6 +28,21 @@ describe('dashboard search', () => {
   it('parses normalized search options from URL parameters', () => {
     const url = new URL('http://localhost/?q=Acme%20%20remote&minScore=0');
     assert.deepEqual(parseDashboardSearchOptions(url), { q: 'Acme remote', minScore: 1 });
+  });
+
+  it('normalizes dashboard page values', () => {
+    assert.equal(normalizeDashboardPage('3'), 3);
+    assert.equal(normalizeDashboardPage(''), 1);
+    assert.equal(normalizeDashboardPage('nope'), 1);
+    assert.equal(normalizeDashboardPage('0'), 1);
+    assert.equal(normalizeDashboardPage('-2'), 1);
+  });
+
+  it('normalizes dashboard view options', () => {
+    assert.deepEqual(
+      normalizeDashboardViewOptions({ q: '  remote   aws  ', minScore: '12', page: '4' }),
+      { q: 'remote aws', minScore: 9, page: 4 }
+    );
   });
 
   it('matches jobs case-insensitively across searchable fields', () => {

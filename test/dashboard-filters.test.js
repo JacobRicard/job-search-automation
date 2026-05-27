@@ -14,6 +14,13 @@ describe('dashboard filter links', () => {
     );
   });
 
+  it('omits default and invalid search state from dashboard URLs', () => {
+    assert.equal(
+      buildDashboardHref('all', 'score', { q: '   ', minScore: 'nope', page: '-1' }),
+      '/?filter=all&sort=score'
+    );
+  });
+
   it('renders filter controls with current search values', () => {
     const html = renderFilters('all', 'score', { myLevel: 12 }, {
       q: 'Acme remote',
