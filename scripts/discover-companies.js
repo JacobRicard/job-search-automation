@@ -2,7 +2,7 @@
 'use strict';
 
 /**
- * Uses Gemini to suggest new tech companies in the DevOps/SRE space, verifies
+ * Uses Gemini to suggest companies based on the user's profile, verifies
  * each company has an active ATS board, then appends verified companies to
  * data/suggested-companies.json so they're scraped on the next run.
  */
@@ -27,6 +27,8 @@ const BOARD_TIMEOUT = 10_000;
 const DEFAULT_DISCOVER_TTL_HOURS = 6;
 const DEFAULT_DISCOVER_CANDIDATE_COUNT = 50;
 const MIN_DISCOVER_OUTPUT_TOKENS = 2000;
+const BOOTSTRAP_THRESHOLD = 20;
+const BOOTSTRAP_PASSES = 4;
 
 const { baseDir: profileDir } = require('../config/paths');
 
@@ -131,26 +133,86 @@ async function mapConcurrent(items, limit, fn) {
 
 function buildPrompt(existingSlugs, contextSnippet, candidateCount = DEFAULT_DISCOVER_CANDIDATE_COUNT) {
   const excludeList = [...existingSlugs].slice(0, 300).join(', ');
-  return `You are helping find tech companies that hire DevOps/SRE/Platform/Infrastructure engineers.
+  const contextSection = contextSnippet
+    ? 'Job seeker context:\n' + contextSnippet + '\n\n'
+    : '';
+  return 'You are helping a job seeker find companies that are actively hiring.\n\n'
+    + contextSection
+    + 'I already track these company board slugs (do NOT suggest any of them):\n'
+    + excludeList + '\n\n'
+    + 'Suggest ' + candidateCount + ' NEW companies likely to have open roles matching these search terms:\n'
+    + SEARCH_TERMS.join(', ') + '\n\n'
+    + 'Return strict JSON only — no markdown, no explanation:\n'
+    + '[{"name":"Company Name","platform":"Greenhouse|Ashby|Lever","slug":"board-slug","rationale":"1 sentence"}]\n\n'
+    + 'Rules:\n'
+    + '- Only use Greenhouse, Ashby, or Lever as the platform (these have public APIs)\n'
+    + '- "slug" is the company\'s ATS board token (e.g. "stripe", "cloudflare", "linear")\n'
+    + '- Focus on companies likely to have open roles matching the search terms above\n'
+    + '- No consulting firms, staffing agencies, or companies that only hire through LinkedIn/Indeed\n'
+    + '- Return exactly ' + candidateCount + ' candidates';
+}
 
-Job seeker context:
-${contextSnippet}
+// ---------------------------------------------------------------------------
+// Single discovery pass
+// ---------------------------------------------------------------------------
 
-I already track these company board slugs (do NOT suggest any of them):
-${excludeList}
+async function runDiscoveryPass(suggested, staticSlugs, contextSnippet, candidateCount, t) {
+  const suggestedSlugSet = allSlugs(suggested);
+  const allTracked = new Set([...staticSlugs, ...suggestedSlugSet]);
 
-Suggest ${candidateCount} NEW companies that are likely to be hiring engineers with these keywords:
-${SEARCH_TERMS.join(', ')}
+  const maxOutputTokens = getDiscoveryMaxOutputTokens(candidateCount);
+  let raw;
+  try {
+    raw = await callGemini(buildPrompt(allTracked, contextSnippet, candidateCount), undefined, maxOutputTokens);
+  } catch (err) {
+    log.error('Gemini call failed', { error: err.message });
+    return 0;
+  }
 
-Return strict JSON only — no markdown, no explanation:
-[{"name":"Company Name","platform":"Greenhouse|Ashby|Lever","slug":"board-slug","rationale":"1 sentence"}]
+  const candidates = parseGeminiJsonArray(raw).filter(
+    (c) => c && typeof c === 'object' && c.slug && c.platform,
+  );
+  log.info('Gemini returned candidates', { count: candidates.length });
 
-Rules:
-- Only use Greenhouse, Ashby, or Lever as the platform (these have public APIs)
-- "slug" is the company's ATS board token (e.g. "stripe", "cloudflare", "hashicorp")
-- Focus on: YC-backed, Series B+, cloud-native infra, fintech, AI infra, dev tooling, security
-- No consulting firms, staffing agencies, or companies that only hire through LinkedIn/Indeed
-- Return exactly ${candidateCount} candidates`;
+  const novel = candidates.filter((c) => !allTracked.has(c.slug.toLowerCase()));
+  log.info('Novel candidates after dedup', { count: novel.length });
+
+  if (novel.length === 0) {
+    log.info('No new company candidates — nothing to verify');
+    return 0;
+  }
+
+  const verifyResults = await mapConcurrent(novel, CONCURRENCY, async (c) => {
+    const slug = c.slug.toLowerCase();
+    const platform = c.platform.toLowerCase();
+    const exists = await boardExists(platform, slug);
+    log.debug('Board check', { slug, platform, exists });
+    return { ...c, slug, platform, exists };
+  });
+
+  const verified = verifyResults.filter((c) => c.exists);
+  const failed   = verifyResults.filter((c) => !c.exists);
+
+  log.info('Board verification complete', { verified: verified.length, failed: failed.length, ms: t() });
+
+  if (failed.length > 0) {
+    log.debug('Boards not found', { slugs: failed.map((c) => c.platform + ':' + c.slug) });
+  }
+
+  for (const c of verified) {
+    if (c.platform === 'greenhouse' && !suggested.greenhouse.includes(c.slug)) {
+      suggested.greenhouse.push(c.slug);
+      log.info('Added to Greenhouse list', { slug: c.slug, name: c.name, rationale: c.rationale });
+    } else if (c.platform === 'ashby' && !suggested.ashby.includes(c.slug)) {
+      suggested.ashby.push(c.slug);
+      log.info('Added to Ashby list', { slug: c.slug, name: c.name, rationale: c.rationale });
+    } else if (c.platform === 'lever' && !suggested.lever.includes(c.slug)) {
+      suggested.lever.push(c.slug);
+      log.info('Added to Lever list', { slug: c.slug, name: c.name, rationale: c.rationale });
+    }
+  }
+
+  return verified.length;
 }
 
 // ---------------------------------------------------------------------------
@@ -166,7 +228,6 @@ async function main() {
   const t = log.timer();
   const discoveryConfig = getDiscoveryConfig();
 
-  // Build full set of already-tracked slugs
   const staticSlugs = new Set([
     ...GREENHOUSE_COMPANIES,
     ...ASHBY_COMPANIES,
@@ -175,25 +236,30 @@ async function main() {
 
   const suggested = loadSuggested(profileDir);
   const suggestedSlugSet = allSlugs(suggested);
-  const allTracked = new Set([...staticSlugs, ...suggestedSlugSet]);
 
   log.info('Loaded tracked companies', {
     static: staticSlugs.size,
     suggested: suggestedSlugSet.size,
-    total: allTracked.size,
+    total: staticSlugs.size + suggestedSlugSet.size,
     ttlHours: discoveryConfig.ttlHours,
     candidateCount: discoveryConfig.candidateCount,
   });
 
-  // Skip if discovery ran recently. DISCOVER_TTL_HOURS=0 forces every refresh to try.
-  const cacheState = getDiscoveryCacheState(suggested.updatedAt, discoveryConfig.ttlMs);
-  if (cacheState.fresh) {
-    log.info('Discovery cache fresh, skipping', {
-      ageHours: cacheState.ageHours,
-      ttlHours: discoveryConfig.ttlHours,
-      nextEligibleAt: cacheState.nextEligibleAt,
-    });
-    process.exit(0);
+  // Bootstrap mode: when the suggested list is nearly empty (fresh install),
+  // run multiple passes to quickly seed companies from the user's profile.
+  const isBootstrap = suggestedSlugSet.size < BOOTSTRAP_THRESHOLD;
+
+  if (!isBootstrap) {
+    // Normal mode: skip if discovery ran recently.
+    const cacheState = getDiscoveryCacheState(suggested.updatedAt, discoveryConfig.ttlMs);
+    if (cacheState.fresh) {
+      log.info('Discovery cache fresh, skipping', {
+        ageHours: cacheState.ageHours,
+        ttlHours: discoveryConfig.ttlHours,
+        nextEligibleAt: cacheState.nextEligibleAt,
+      });
+      process.exit(0);
+    }
   }
 
   // Load context snippet from profile
@@ -205,89 +271,26 @@ async function main() {
     log.debug('No context.md found in profile dir — continuing without it');
   }
 
-  const maxOutputTokens = getDiscoveryMaxOutputTokens(discoveryConfig.candidateCount);
-  log.info('Calling Gemini for company suggestions', {
-    candidateCount: discoveryConfig.candidateCount,
-    maxOutputTokens,
-  });
-  let raw;
-  try {
-    raw = await callGemini(buildPrompt(allTracked, contextSnippet, discoveryConfig.candidateCount), undefined, maxOutputTokens);
-  } catch (err) {
-    log.error('Gemini call failed', { error: err.message });
-    process.exit(0);
-  }
-
-  const candidates = parseGeminiJsonArray(raw).filter(
-    (c) => c && typeof c === 'object' && c.slug && c.platform,
-  );
-  log.info('Gemini returned candidates', { count: candidates.length });
-
-  // Filter already-tracked slugs
-  const novel = candidates.filter((c) => !allTracked.has(c.slug.toLowerCase()));
-  log.info('Novel candidates after dedup', { count: novel.length });
-
-  if (novel.length === 0) {
-    suggested.updatedAt = new Date().toISOString();
-    saveSuggested(profileDir, suggested);
-    log.info('No new company candidates — nothing to verify', {
-      nextEligibleAt: nextEligibleAt(suggested.updatedAt, discoveryConfig.ttlMs),
-      totalSuggested: allSlugs(suggested).size,
+  const passes = isBootstrap ? BOOTSTRAP_PASSES : 1;
+  if (isBootstrap) {
+    log.info('Bootstrap mode: running multiple discovery passes to seed initial company list', {
+      passes,
+      reason: 'only ' + suggestedSlugSet.size + ' companies found so far (threshold: ' + BOOTSTRAP_THRESHOLD + ')',
     });
-    process.exit(0);
   }
 
-  // Verify boards in parallel
-  const verifyResults = await mapConcurrent(novel, CONCURRENCY, async (c) => {
-    const slug = c.slug.toLowerCase();
-    const platform = c.platform.toLowerCase();
-    const exists = await boardExists(platform, slug);
-    log.debug('Board check', { slug, platform, exists });
-    return { ...c, slug, platform, exists };
-  });
-
-  const verified = verifyResults.filter((c) => c.exists);
-  const failed   = verifyResults.filter((c) => !c.exists);
-
-  log.info('Board verification complete', {
-    verified: verified.length,
-    failed: failed.length,
-    ms: t(),
-  });
-
-  if (failed.length > 0) {
-    log.debug('Boards not found', { slugs: failed.map((c) => `${c.platform}:${c.slug}`) });
-  }
-
-  if (verified.length === 0) {
-    suggested.updatedAt = new Date().toISOString();
-    saveSuggested(profileDir, suggested);
-    log.info('No verified boards — suggested-companies.json unchanged', {
-      nextEligibleAt: nextEligibleAt(suggested.updatedAt, discoveryConfig.ttlMs),
-      totalSuggested: allSlugs(suggested).size,
-    });
-    process.exit(0);
-  }
-
-  // Append to suggested-companies.json
-  for (const c of verified) {
-    if (c.platform === 'greenhouse' && !suggested.greenhouse.includes(c.slug)) {
-      suggested.greenhouse.push(c.slug);
-      log.info('Added to Greenhouse list', { slug: c.slug, name: c.name, rationale: c.rationale });
-    } else if (c.platform === 'ashby' && !suggested.ashby.includes(c.slug)) {
-      suggested.ashby.push(c.slug);
-      log.info('Added to Ashby list', { slug: c.slug, name: c.name, rationale: c.rationale });
-    } else if (c.platform === 'lever' && !suggested.lever.includes(c.slug)) {
-      suggested.lever.push(c.slug);
-      log.info('Added to Lever list', { slug: c.slug, name: c.name, rationale: c.rationale });
-    }
+  let totalAdded = 0;
+  for (let i = 0; i < passes; i++) {
+    if (passes > 1) log.info('Discovery pass ' + (i + 1) + ' of ' + passes);
+    const added = await runDiscoveryPass(suggested, staticSlugs, contextSnippet, discoveryConfig.candidateCount, t);
+    totalAdded += added;
   }
 
   suggested.updatedAt = new Date().toISOString();
   saveSuggested(profileDir, suggested);
 
   log.info('Discovery complete', {
-    added: verified.length,
+    added: totalAdded,
     totalSuggested: allSlugs(suggested).size,
     nextEligibleAt: nextEligibleAt(suggested.updatedAt, discoveryConfig.ttlMs),
     ms: t(),
@@ -304,6 +307,8 @@ if (require.main === module) {
 module.exports = {
   DEFAULT_DISCOVER_TTL_HOURS,
   DEFAULT_DISCOVER_CANDIDATE_COUNT,
+  BOOTSTRAP_THRESHOLD,
+  BOOTSTRAP_PASSES,
   buildPrompt,
   getDiscoveryConfig,
   getDiscoveryCacheState,
