@@ -1,23 +1,23 @@
 # Job Search Automation
 
-**A private, local, AI-powered job search engine and dashboard.**
+**A private, local, AI-powered job search engine that runs entirely on your machine.**
 
-Runs 100% on your machine. Your resume, your applications, your notes, your data — never leave your laptop. No SaaS, no account, no telemetry. Just a Docker container talking to Google's free Gemini API on your behalf.
+It scrapes 11+ ATS platforms, scores every listing against your resume with Google's free Gemini API, and serves a dashboard at `http://localhost:3131` for review and pipeline tracking. No SaaS, no account, no telemetry. Your resume, applications, and notes never leave your laptop.
 
-It scrapes 11+ ATS platforms (Greenhouse, Lever, Ashby, Workable, Workday, Wellfound, Built In, Rippling, RemoteOK, Jobicy, Arbeitnow, WeWorkRemotely), scores every listing with Gemini against your resume, and serves a local dashboard at `http://localhost:3131` for review and pipeline tracking.
+Platforms covered: Greenhouse, Lever, Ashby, Workable, Workday, Wellfound, Built In, Rippling, RemoteOK, Jobicy, Arbeitnow, and WeWorkRemotely.
 
 ## Screenshots
 
-### Dashboard, scored, ranked, filterable job listings
+**Dashboard.** Scored, ranked, filterable listings.
 ![Dashboard](docs/screenshots/dashboard.png)
 
-### Applied pipeline, track stage progression
+**Applied pipeline.** Track stage progression.
 ![Applied pipeline](docs/screenshots/applied.png)
 
-### Analytics, pipeline funnel and score calibration
+**Analytics.** Pipeline funnel and score calibration.
 ![Analytics](docs/screenshots/analytics.png)
 
-### Market Research, LLM gap analysis against your resume
+**Market research.** LLM gap analysis against your resume.
 ![Market Research](docs/screenshots/market-research.png)
 
 <p float="left">
@@ -26,96 +26,83 @@ It scrapes 11+ ATS platforms (Greenhouse, Lever, Ashby, Workable, Workday, Wellf
   <img src="docs/screenshots/activity-log.png" width="32%" alt="Activity log" />
 </p>
 
-## Quickstart (3 minutes)
+## Quickstart
 
-You need Docker Desktop (or any modern Docker + Compose v2). Nothing else. No Node, no Python, no compilers.
+The only thing you need is **Docker Desktop** (or any modern Docker with Compose v2). No Node, no Python, no compilers.
 
 ```bash
 # 1. Clone
 git clone https://github.com/jakemercure28/job-search-automation.git
 cd job-search-automation
 
-# 2. Copy the env template
+# 2. Create your env file
 cp .env.example .env
 
-# 3. Get a FREE Gemini API key at https://aistudio.google.com/apikey
-#    Paste it into .env as GEMINI_API_KEY=...
-
-# 4. Set up your data directory
-./scripts/setup.sh
-
-# 5. Bring it up
+# 3. Bring it up
 docker compose up -d
 ```
 
-Open **http://localhost:3131**. A setup wizard will guide you through filling in your resume and job targets. The worker container will then scrape, score, and populate the dashboard automatically.
+Now open **http://localhost:3131**. A setup wizard walks you through everything in the browser: paste in your Gemini API key, drop in your resume, set your target titles, and pick the companies to scrape. The worker then scrapes, scores, and fills the dashboard automatically.
 
-### Tuned for the Gemini Free Tier
+> **Get a free Gemini API key** at https://aistudio.google.com/apikey. No credit card required. The defaults keep you safely inside the free tier (500 requests/day, 15 RPM), so a paid plan is never needed.
 
-Out of the box, this app is paced to stay within Google AI Studio's free tier (500 requests/day, 15 RPM). The default `GEMINI_RATE_DELAY_MS=5000` throttles outbound calls to roughly 12 RPM, leaving headroom under the free quota. **You do not need a paid plan.** If you ever upgrade to a paid key, lower the delay in `.env`.
+That's the whole setup. Everything below is reference.
 
 ## What it does
 
 - **Multi-source scraping.** Pulls fresh listings from 11+ ATS platforms on a schedule.
-- **LLM scoring.** Gemini scores each job 1-10 along five dimensions (stack match, seniority, comp, company stage, desirability), grounded in your resume and context files. Deterministic post-processing caps mis-rated roles (e.g., roles requiring 8+ YOE cap at 3 regardless of prompt output).
+- **LLM scoring.** Gemini scores each job 1 to 10 across five dimensions (stack match, seniority, comp, company stage, desirability), grounded in your resume. Deterministic post-processing caps mis-rated roles, so a job requiring 8+ years of experience caps at 3 regardless of the model's output.
 - **Complexity tagging.** Each job is tagged `simple` or `complex` so you can plan your day's manual applies.
-- **Pipeline tracking.** Manual stage transitions: Pending → Applied → Phone Screen → Interview → Onsite → Offer / Rejected / Closed / Ghosted.
+- **Pipeline tracking.** Manual stage transitions: Pending, Applied, Phone Screen, Interview, Onsite, Offer, Rejected, Closed, Ghosted.
 - **Market research.** Aggregate JD analysis against your profile: top skills, seniority, comp signals, and emerging high-score patterns.
-- **Optional Gmail rejection sync.** If you give it Gmail IMAP credentials, it watches your inbox every 5 minutes and auto-flips matching jobs to `rejected` with the parsed reason.
+- **Optional Gmail rejection sync.** Give it Gmail IMAP credentials and it watches your inbox every 5 minutes, auto-flipping matching jobs to `rejected` with the parsed reason.
 
-Final application submission is always manual. The pipeline dropdown is the only thing that writes "applied" — scraping and scoring never do.
+Final application submission is always manual. The pipeline dropdown is the only thing that writes "applied". Scraping and scoring never do.
 
-## Dashboard tour
+## Dashboard at a glance
 
 | View | What's there |
 | --- | --- |
-| **All** | Active jobs that aren't archived/closed/rejected/ghosted |
+| **All** | Active jobs that aren't archived, closed, rejected, or ghosted |
 | **Not Applied** | The main triage queue |
 | **Applied** | Submitted apps still in play |
 | **Interviewing** | Phone screen, interview, onsite, offer |
 | **Rejected / Closed / Ghosted / Archived** | Terminal or hidden queues |
 | **Stats** | Funnel, score calibration, recent events, rejection timing |
-| **Event Log** | Audit trail of every stage/outreach/archive change |
+| **Event Log** | Audit trail of every stage, outreach, and archive change |
 | **Market Research** | LLM gap analysis vs your resume |
-| **Help** (`/help`) | In-app reference with live runtime paths |
 
 ## Configuration
 
-Everything is in `.env`. The defaults work for most people; the file is heavily commented. A few common knobs:
+Everything lives in `.env`, which is heavily commented. The defaults work for most people. The knobs you're most likely to touch:
 
 | Variable | Purpose |
 | --- | --- |
 | `GEMINI_API_KEY` | **Required.** Free key from https://aistudio.google.com/apikey |
-| `GEMINI_RATE_DELAY_MS` | Throttle between Gemini calls. Default `5000` (free-tier safe). |
-| `LOCATION_FILTER` / `LOCATION_BLOCKLIST` | Comma-separated allow/deny lists for job locations |
-| `BUILTIN_SUBDOMAIN` | Region for the Built In scraper (e.g. `seattle`, `nyc`, `austin`, or `www`) |
-| `REFRESH_INTERVAL_MINUTES` | How often the worker container runs the full refresh. Default `30`. |
+| `GEMINI_RATE_DELAY_MS` | Throttle between Gemini calls. Default `5000` (free-tier safe). Lower it on a paid key. |
+| `LOCATION_FILTER` / `LOCATION_BLOCKLIST` | Comma-separated allow and deny lists for job locations |
+| `BUILTIN_SUBDOMAIN` | Region for the Built In scraper (`seattle`, `nyc`, `austin`, or `www`) |
+| `REFRESH_INTERVAL_MINUTES` | How often the worker runs the full refresh. Default `30`. |
 | `GMAIL_EMAIL` / `GMAIL_APP_PASSWORD` | Optional. Enables rejection email sync. Use a Google [app password](https://myaccount.google.com/apppasswords). |
 | `DASHBOARD_PORT` | Default `3131` |
 
-## Personalizing your setup
+## Manual setup (optional)
 
-Your personal data lives in `data/`. The repo ships an example at `data.example/` so the app has something to score against, but you need to replace it with your own before the scoring means anything.
+Prefer editing files over the browser wizard? Run the setup script to scaffold your data directory, then edit three files:
 
-Run `./scripts/setup.sh` to copy the example to `data/`, then edit three files:
+```bash
+./scripts/setup.sh
+```
 
 | File | What to put there |
 | --- | --- |
-| `data/resume.md` | Your resume in plain text or markdown. Gemini reads this to score job fit. Prose, bullets, tables — any format works. |
-| `data/context.md` | Target titles, preferred tech stack, comp range, location preferences, deal breakers. This narrows scoring beyond what the resume alone captures. |
-| `data/companies.js` | The companies you want to scrape, grouped by ATS platform. Update `SEARCH_TERMS` at the top to match your target role (e.g. `'product manager'`, `'data engineer'`). For each company, use the slug from its public job-board URL: `boards.greenhouse.io/stripe` → slug `stripe`. |
+| `data/resume.md` | Your resume in plain text or markdown. Gemini reads this to score fit. |
+| `data/context.md` | Target titles, preferred stack, comp range, location preferences, deal breakers. |
+| `data/companies.js` | Companies to scrape, grouped by ATS platform. Use the slug from each public job-board URL (`boards.greenhouse.io/stripe` becomes `stripe`), and set `SEARCH_TERMS` at the top to your target role. |
 
-**Or:** skip the manual editing and use the setup wizard at `localhost:3131` after `docker compose up -d`. It walks you through filling in the same files via the browser.
+Add your `GEMINI_API_KEY` to `.env`, then `docker compose up -d`.
 
-## Claude Code users
-
-The `.context/` directory and `.claude/` folder contain AI-assistant instructions for slash commands like `/load-context`, `/job-search`, and `/interview-prep`. They are not required to run the app.
-
-If you use Claude Code: copy `.context.example` to `.context`, run `./scripts/setup.sh`, and edit both to match you.
-
-If you don't: ignore `.context/`, `.claude/`, and `CLAUDE.md` entirely. The scraper, scorer, and dashboard run fine without them.
-
-## Stopping and updating
+## Updating and stopping
 
 ```bash
 # Stop everything
@@ -126,42 +113,37 @@ git pull
 docker compose up -d --build
 ```
 
-Your data lives in `./data/` (a local SQLite file plus your resume and context). It survives container restarts and rebuilds.
+Your data lives in `./data` (a local SQLite file plus your resume and context). It survives restarts and rebuilds.
 
 ## Backups
 
-All of your data is one folder: `./data/`. Back that folder up however you already back up the rest of your machine.
+All your data is one folder: `./data`. Back it up however you back up the rest of your machine.
 
-**Recommended: let your OS do it.** Time Machine (macOS), iCloud Drive, OneDrive, or File History (Windows) will sync `./data/` continuously with zero config.
+The simplest option is to let your OS do it. Time Machine, iCloud Drive, OneDrive, or File History will sync `./data` continuously with zero config.
 
-**Local snapshots.** For timestamped archives on the same machine:
+For timestamped local snapshots:
 
 ```bash
 ./scripts/backup.sh                  # writes to ./backups/
 ./scripts/backup.sh /path/to/dir     # or any directory you choose
 ```
 
-The script uses SQLite's native `.backup` command, so it's safe to run while the worker container is up. To restore, copy the snapshot DB back to `data/jobs.db` (with the container stopped) or untar the archive.
+The script uses SQLite's native `.backup`, so it's safe to run while the worker is up. No cloud sync is built in by design. Your data, your destination.
 
-Daily cron example:
+## Claude Code users
 
-```cron
-0 3 * * * cd /path/to/job-search-automation && ./scripts/backup.sh
-```
-
-No cloud sync is built into this project by design. Your data, your destination.
+This repo ships AI-assistant instructions in `.context/` and `.claude/` for slash commands like `/load-context`, `/job-search`, and `/interview-prep`. They are entirely optional. To use them, copy `.context.example` to `.context` and edit it to match you. The scraper, scorer, and dashboard run fine without any of it.
 
 ## Privacy
 
 All data is local. The only outbound traffic is:
+
 1. Scrapers fetching public ATS endpoints.
-2. Gemini API calls to score jobs (just the JD text and your resume context, sent to Google).
+2. Gemini API calls to score jobs (the JD text and your resume context, sent to Google).
 3. Optional Gmail IMAP, if you configure it.
 
-Nothing is sent to any third party operated by this project. There is no third party operated by this project.
+There is no third party operated by this project, so nothing is ever sent to one.
 
 ## Disclaimer
 
-Scrapers hit public job-board endpoints and respect typical rate-limit and User-Agent conventions. Before running at scale, review each site's Terms of Service.
-
-Use responsibly. Not a guarantee of interviews, offers, or anything else.
+Scrapers hit public job-board endpoints and respect typical rate-limit and User-Agent conventions. Before running at scale, review each site's Terms of Service. Use responsibly. This is not a guarantee of interviews, offers, or anything else.
