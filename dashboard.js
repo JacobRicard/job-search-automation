@@ -18,7 +18,8 @@ const zlib = require('zlib');
 const { getDb } = require('./lib/db');
 const { DASHBOARD_PORT } = require('./config/constants');
 const { publicDir } = require('./config/paths');
-const log = require('./lib/logger')('dashboard');
+const logPaths = require('./lib/log-paths');
+const log = require('./lib/logger')('dashboard', { logFile: logPaths.daily('dashboard') });
 const metrics = require('./lib/metrics');
 const { startRejectionEmailPoller } = require('./lib/rejection-email-sync');
 const { recordStatusSnapshot } = require('./lib/dashboard-insights');
@@ -56,7 +57,8 @@ const {
   handleSetupApiKey,
   handleSetupTestKey,
   handleExtractProfile,
-} = createSetupHandlers({ profileDir: PROFILE_DIR, envPath: ENV_PATH });
+  handleSetupRunRefresh,
+} = createSetupHandlers({ profileDir: PROFILE_DIR, envPath: ENV_PATH, log, repoRoot: __dirname });
 
 // ---------------------------------------------------------------------------
 // Static file serving
@@ -104,6 +106,7 @@ const routes = {
   'POST /api/setup/api-key': handleSetupApiKey,
   'POST /api/setup/test-key': handleSetupTestKey,
   'POST /api/setup/extract-profile': handleExtractProfile,
+  'POST /api/setup/run-refresh': handleSetupRunRefresh,
   'GET /help':               handleHelpPage,
   'GET /':                   handleDashboardPage,
 };

@@ -361,14 +361,22 @@ function wizardGoTo(step) {
 function wizardKickoffPipeline() {
   var icon = document.getElementById('wizard-pipeline-icon');
   var msg = document.getElementById('wizard-pipeline-msg');
-  fetch('/pipeline', { method: 'POST' })
-    .then(function() {
-      if (icon) icon.textContent = '✅';
-      if (msg) { msg.textContent = 'Job search is running. Check the Pending tab in a few minutes.'; msg.style.color = 'var(--text-primary)'; }
+  fetch('/api/setup/run-refresh', { method: 'POST' })
+    .then(function(r) { return r.json().then(function(d) { return { ok: r.ok, data: d }; }); })
+    .then(function(result) {
+      if (result.ok && result.data && result.data.ok) {
+        if (icon) icon.textContent = '✅';
+        if (msg) { msg.textContent = 'Job search is running (runId ' + result.data.runId + '). Check the Pending tab in a few minutes.'; msg.style.color = 'var(--text-primary)'; }
+      } else {
+        console.error('[wizard] kickoff failed:', result.data);
+        if (icon) icon.textContent = '⚠️';
+        if (msg) { msg.textContent = 'Could not start pipeline: ' + ((result.data && result.data.error) || 'unknown error'); msg.style.color = 'var(--red)'; }
+      }
     })
-    .catch(function() {
+    .catch(function(err) {
+      console.error('[wizard] kickoff fetch failed:', err);
       if (icon) icon.textContent = '⚠️';
-      if (msg) msg.textContent = 'Could not start pipeline. Run it manually from the dashboard.';
+      if (msg) { msg.textContent = 'Could not start pipeline: ' + (err && err.message ? err.message : 'network error'); msg.style.color = 'var(--red)'; }
     });
 }
 
@@ -446,32 +454,53 @@ function wizardSaveResume() {
   if (isPdf) {
     var reader = new FileReader();
     reader.onload = function(e) {
-      var base64 = btoa(String.fromCharCode.apply(null, new Uint8Array(e.target.result)));
-      fetch('/api/setup/resume', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ content: base64, format: 'pdf' }),
-      })
-        .then(function(r) { return r.json(); })
-        .then(function(data) {
-          if (!data.ok && data.error === 'no_key') {
-            if (status) { status.textContent = 'Enter your Gemini API key in step 1 to upload PDFs, or upload a .txt file.'; status.style.color = 'var(--red)'; }
-            if (saveBtn) saveBtn.disabled = false;
-            return;
-          }
-          if (!data.ok) {
-            if (status) { status.textContent = 'Upload failed. Try a .txt file instead.'; status.style.color = 'var(--red)'; }
-            if (saveBtn) saveBtn.disabled = false;
-            return;
-          }
-          if (saveBtn) saveBtn.disabled = false;
-          wizardNext();
-          wizardAutoFillTargets();
+      try {
+        var bytes = new Uint8Array(e.target.result);
+        var binary = '';
+        var chunk = 0x8000;
+        for (var i = 0; i < bytes.length; i += chunk) {
+          binary += String.fromCharCode.apply(null, bytes.subarray(i, i + chunk));
+        }
+        var base64 = btoa(binary);
+        console.log('[wizard] uploading PDF resume, bytes=' + bytes.length + ' base64=' + base64.length);
+        fetch('/api/setup/resume', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ content: base64, format: 'pdf' }),
         })
-        .catch(function() {
-          if (status) { status.textContent = 'Upload failed.'; status.style.color = 'var(--red)'; }
-          if (saveBtn) saveBtn.disabled = false;
-        });
+          .then(function(r) { return r.json(); })
+          .then(function(data) {
+            if (!data.ok && data.error === 'no_key') {
+              if (status) { status.textContent = 'Enter your Gemini API key in step 1 to upload PDFs, or upload a .txt file.'; status.style.color = 'var(--red)'; }
+              if (saveBtn) saveBtn.disabled = false;
+              return;
+            }
+            if (!data.ok) {
+              console.error('[wizard] resume upload rejected by server:', data.error);
+              var msg = data.error ? ('Upload failed: ' + data.error) : 'Upload failed. Try a .txt file instead.';
+              if (status) { status.textContent = msg; status.style.color = 'var(--red)'; }
+              if (saveBtn) saveBtn.disabled = false;
+              return;
+            }
+            if (saveBtn) saveBtn.disabled = false;
+            wizardNext();
+            wizardAutoFillTargets();
+          })
+          .catch(function(err) {
+            console.error('[wizard] resume upload fetch failed:', err);
+            if (status) { status.textContent = 'Upload failed: ' + (err && err.message ? err.message : 'network error'); status.style.color = 'var(--red)'; }
+            if (saveBtn) saveBtn.disabled = false;
+          });
+      } catch (err) {
+        console.error('[wizard] resume read/encode failed:', err);
+        if (status) { status.textContent = 'Upload failed: ' + err.message; status.style.color = 'var(--red)'; }
+        if (saveBtn) saveBtn.disabled = false;
+      }
+    };
+    reader.onerror = function() {
+      console.error('[wizard] FileReader error:', reader.error);
+      if (status) { status.textContent = 'Could not read file: ' + (reader.error && reader.error.message ? reader.error.message : 'unknown'); status.style.color = 'var(--red)'; }
+      if (saveBtn) saveBtn.disabled = false;
     };
     reader.readAsArrayBuffer(file);
   } else {
