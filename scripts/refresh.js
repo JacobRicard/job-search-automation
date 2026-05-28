@@ -2,10 +2,10 @@
 'use strict';
 
 const path = require('path');
-const { spawnSync } = require('child_process');
+const { spawnSync, spawn } = require('child_process');
 
 const { loadDashboardEnv, loadEnvFile } = require('../lib/env');
-const { formatBuffer } = require('../lib/refresh-logger');
+const { formatBuffer, formatLine } = require('../lib/refresh-logger');
 const { formatLocalTime, formatLocalTimestamp } = require('../lib/time-format');
 
 function createRunId(prefix = 'refresh') {
@@ -85,6 +85,73 @@ function runStep(repoRoot, label, args, { optional = false } = {}) {
   process.exit(result.status || 1);
 }
 
+// Streaming variant — line-buffers child stderr/stdout so JSON log lines are
+// pretty-printed AS THEY ARRIVE rather than dumped in one batch when the child
+// exits. Used for long-running steps (pipeline, retry-unscored) where the
+// silent gap between start and finish is otherwise minutes long.
+function runStepStreaming(repoRoot, label, args, { optional = false } = {}) {
+  return new Promise((resolve) => {
+    const start = Date.now();
+    const runId = process.env.RUN_ID || '';
+    const tag = runId ? `[refresh runId=${runId}]` : '[refresh]';
+    console.log(`${formatLocalTime()}  ${tag}  ${label}...`);
+
+    if (!IS_LOG) {
+      // Interactive TTY — inherit and stream natively, same as runStep.
+      const result = spawnSync(process.execPath, args, {
+        cwd: repoRoot, stdio: 'inherit', env: process.env,
+      });
+      if (result.status === 0) {
+        console.log(`${formatLocalTime()}  ${tag}  ${label} done (${elapsed(start)})`);
+      } else if (optional) {
+        console.warn(`${formatLocalTime()}  ${tag}  ${label} skipped, exit ${result.status || 1} (${elapsed(start)})`);
+      } else {
+        console.error(`${formatLocalTime()}  ${tag}  ${label} FAILED, exit ${result.status || 1} (${elapsed(start)})`);
+        process.exit(result.status || 1);
+      }
+      return resolve();
+    }
+
+    const child = spawn(process.execPath, args, {
+      cwd: repoRoot,
+      stdio: ['ignore', 'pipe', 'pipe'],
+      env: process.env,
+    });
+
+    const consumeStream = (stream) => {
+      let buf = '';
+      stream.setEncoding('utf8');
+      stream.on('data', (chunk) => {
+        buf += chunk;
+        let nlIdx;
+        while ((nlIdx = buf.indexOf('\n')) >= 0) {
+          const line = buf.slice(0, nlIdx);
+          buf = buf.slice(nlIdx + 1);
+          if (line.length) console.log(formatLine(line));
+        }
+      });
+      stream.on('end', () => {
+        if (buf.length) console.log(formatLine(buf));
+      });
+    };
+
+    consumeStream(child.stderr);
+    consumeStream(child.stdout);
+
+    child.on('close', (code) => {
+      if (code === 0) {
+        console.log(`${formatLocalTime()}  ${tag}  ${label} done (${elapsed(start)})`);
+      } else if (optional) {
+        console.warn(`${formatLocalTime()}  ${tag}  ${label} skipped, exit ${code || 1} (${elapsed(start)})`);
+      } else {
+        console.error(`${formatLocalTime()}  ${tag}  ${label} FAILED, exit ${code || 1} (${elapsed(start)})`);
+        process.exit(code || 1);
+      }
+      resolve();
+    });
+  });
+}
+
 function printUsage() {
   console.log(`Usage: node scripts/refresh.js [flags]
 
@@ -110,7 +177,7 @@ Flags:
 `);
 }
 
-function main() {
+async function main() {
   const repoRoot = path.resolve(__dirname, '..');
   const args = parseArgs(process.argv.slice(2));
 
@@ -136,8 +203,8 @@ function main() {
   }
 
   runStep(repoRoot, 'Scraping jobs', ['scraper.js']);
-  runStep(repoRoot, 'Running pipeline', ['pipeline.js']);
-  runStep(repoRoot, 'Retrying unscored jobs', ['scripts/retry-unscored.js', '--limit=25'], { optional: true });
+  await runStepStreaming(repoRoot, 'Running pipeline', ['pipeline.js']);
+  await runStepStreaming(repoRoot, 'Retrying unscored jobs', ['scripts/retry-unscored.js', '--limit=25'], { optional: true });
 
   if (!args.skipDescriptions) {
     runStep(repoRoot, 'Checking description quality', ['scripts/check-descriptions.js'], { optional: true });
@@ -176,7 +243,10 @@ function main() {
 }
 
 if (require.main === module) {
-  main();
+  main().catch((err) => {
+    console.error(`${formatLocalTime()}  [refresh]  Fatal error: ${err.message}`);
+    process.exit(1);
+  });
 }
 
 module.exports = {
