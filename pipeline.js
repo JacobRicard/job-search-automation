@@ -245,7 +245,18 @@ async function run() {
   const archiveThreshold = parseInt(process.env.AUTO_ARCHIVE_THRESHOLD, 10) || 4;
   const autoArchive = db.prepare("UPDATE jobs SET status='archived', updated_at=datetime('now') WHERE id=? AND score <= ?");
 
-  for (const job of toScore) {
+  const scoreTotal = toScore.length;
+  const progressEvery = Math.max(10, Math.floor(scoreTotal / 20));
+  const scoreStartedAt = Date.now();
+  let scoredOk = 0;
+  let scoredFailed = 0;
+
+  if (scoreTotal > 0) {
+    log.info('Scoring started', { total: scoreTotal });
+  }
+
+  for (let i = 0; i < toScore.length; i++) {
+    const job = toScore[i];
     markJobScoreAttempt(db, job.id);
 
     try {
@@ -254,15 +265,32 @@ async function run() {
       if (score == null) {
         const error = reasoning || 'Gemini returned an unparsable score.';
         markJobScoreFailure(db, job.id, error);
+        scoredFailed++;
         log.error('Scoring failed', { title: job.title, error });
-        continue;
+      } else {
+        updateJobScore(db, job.id, score, reasoning);
+        scoredOk++;
+        if (score !== null && score <= archiveThreshold) autoArchive.run(job.id, archiveThreshold);
       }
-
-      updateJobScore(db, job.id, score, reasoning);
-      if (score !== null && score <= archiveThreshold) autoArchive.run(job.id, archiveThreshold);
     } catch (e) {
       markJobScoreFailure(db, job.id, e.message);
+      scoredFailed++;
       log.error('Scoring failed', { title: job.title, error: e.message });
+    }
+
+    const done = i + 1;
+    if (done === scoreTotal || done % progressEvery === 0) {
+      const elapsedSec = Math.round((Date.now() - scoreStartedAt) / 1000);
+      const remaining = scoreTotal - done;
+      const etaSec = done > 0 ? Math.round((elapsedSec / done) * remaining) : 0;
+      log.info('Scoring progress', {
+        done,
+        total: scoreTotal,
+        scoredOk,
+        scoredFailed,
+        elapsedSec,
+        etaSec,
+      });
     }
   }
 
