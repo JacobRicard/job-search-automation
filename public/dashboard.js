@@ -616,6 +616,67 @@ function wizardDone() {
 }
 
 // ---------------------------------------------------------------------------
+// Scoring progress banner — keeps users informed while the background pipeline
+// imports, scores, and classifies. Polls /api/scoring-progress every 7s, hides
+// itself when there's nothing left to score, and triggers a single page reload
+// once new scores have landed (so the empty list fills in).
+// ---------------------------------------------------------------------------
+
+(function () {
+  var banner = document.getElementById('scoring-progress-banner');
+  if (!banner) return;
+  var msgEl = document.getElementById('scoring-progress-msg');
+  var barEl = document.getElementById('scoring-progress-bar');
+  var initialScored = null;
+  var reloadedOnce = false;
+
+  function formatEta(seconds) {
+    if (!seconds || seconds < 60) return 'about a minute';
+    var mins = Math.round(seconds / 60);
+    if (mins < 60) return '~' + mins + ' min';
+    var hrs = Math.round(mins / 10) / 6;
+    return '~' + hrs + ' hr';
+  }
+
+  function poll() {
+    fetch('/api/scoring-progress')
+      .then(function (r) { return r.json(); })
+      .then(function (d) {
+        if (!d || typeof d.unscored !== 'number') return;
+        if (initialScored === null) initialScored = d.scored;
+        if (d.unscored === 0) {
+          banner.style.display = 'none';
+          if (!reloadedOnce && d.scored > initialScored) {
+            reloadedOnce = true;
+            location.reload();
+          }
+          return;
+        }
+        var pct = d.total > 0 ? Math.round((d.scored / d.total) * 100) : 0;
+        var stateLabel;
+        if (d.scored === 0 && !d.active) {
+          stateLabel = 'Setting up your first job search — importing companies and job boards in the background.';
+        } else if (d.scored === 0) {
+          stateLabel = 'Scoring your first jobs against your resume… (ETA ' + formatEta(d.etaSeconds) + ')';
+        } else {
+          stateLabel = 'Scoring ' + d.scored + ' of ' + d.total + ' jobs against your resume — ETA ' + formatEta(d.etaSeconds) + '. Top matches appear at the top of the list as they score.';
+        }
+        banner.style.display = 'flex';
+        msgEl.textContent = stateLabel;
+        barEl.style.width = pct + '%';
+        if (!reloadedOnce && d.scored >= 25 && initialScored < 25) {
+          reloadedOnce = true;
+          location.reload();
+        }
+      })
+      .catch(function () { /* keep polling; transient failures are fine */ });
+  }
+
+  poll();
+  setInterval(poll, 7000);
+})();
+
+// ---------------------------------------------------------------------------
 // Score comparison pagination (analytics page)
 // ---------------------------------------------------------------------------
 

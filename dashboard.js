@@ -38,6 +38,7 @@ const {
   handleTrackerApi,
   handleInsightsApi,
   handleLocationPrefsApi,
+  handleScoringProgress,
 } = require('./lib/dashboard-routes');
 const { createSetupHandlers } = require('./lib/setup-routes');
 
@@ -99,6 +100,7 @@ const routes = {
   'GET /api/insights':       handleInsightsApi,
   'GET /api/location-prefs': handleLocationPrefsApi,
   'POST /api/location-prefs': handleLocationPrefsApi,
+  'GET /api/scoring-progress': handleScoringProgress,
   'GET /api/setup/status':   handleSetupStatus,
   'POST /api/setup/resume':  handleSetupResume,
   'POST /api/setup/profile': handleSetupProfile,
