@@ -84,16 +84,28 @@ describe('pipeline manual application boundary', () => {
   });
 
   it('skips large scoring spikes unless explicitly allowed', () => {
-    const candidates = Array.from({ length: 51 }, (_, index) => ({ id: `job-${index}` }));
+    const candidates = Array.from({ length: 201 }, (_, index) => ({ id: `job-${index}` }));
 
     const guarded = getScoringPlan(candidates, {});
     assert.equal(guarded.skipForSpike, true);
-    assert.equal(guarded.threshold, 50);
-    assert.equal(guarded.candidates, 51);
+    assert.equal(guarded.threshold, 200);
+    assert.equal(guarded.candidates, 201);
     assert.deepEqual(guarded.jobs, []);
 
     const allowed = getScoringPlan(candidates, { ALLOW_SCORE_SPIKE: '1' });
     assert.equal(allowed.skipForSpike, false);
-    assert.equal(allowed.jobs.length, 51);
+    assert.equal(allowed.jobs.length, 201);
+  });
+
+  it('bypasses the spike guard on first run so new profiles fill the dashboard', () => {
+    const candidates = Array.from({ length: 500 }, (_, index) => ({ id: `job-${index}` }));
+
+    const firstRun = getScoringPlan(candidates, {}, { firstRun: true });
+    assert.equal(firstRun.skipForSpike, false);
+    assert.equal(firstRun.firstRun, true);
+    assert.equal(firstRun.jobs.length, 500);
+
+    const steadyState = getScoringPlan(candidates, {}, { firstRun: false });
+    assert.equal(steadyState.skipForSpike, true);
   });
 });
