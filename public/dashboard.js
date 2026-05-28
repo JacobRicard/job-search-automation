@@ -550,8 +550,9 @@ function wizardAutoFillTargets() {
     .then(function(r) { return r.json(); })
     .then(function(data) {
       if (data.ok && (data.titles || data.stack)) {
-        if (data.titles) { var el = document.getElementById('wizard-titles'); if (el) el.value = data.titles; }
-        if (data.stack)  { var el = document.getElementById('wizard-stack');  if (el) el.value = data.stack;  }
+        if (data.titles)  { var el = document.getElementById('wizard-titles');  if (el) el.value = data.titles; }
+        if (data.stack)   { var el = document.getElementById('wizard-stack');   if (el) el.value = data.stack;  }
+        if (data.salary)  { var el = document.getElementById('wizard-salary');  if (el) el.value = data.salary; }
         if (autofillStatus) { autofillStatus.textContent = 'Auto-filled from your resume. Edit as needed.'; autofillStatus.style.color = 'var(--green)'; }
       } else {
         if (autofillStatus) { autofillStatus.textContent = ''; }

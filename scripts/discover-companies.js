@@ -25,10 +25,10 @@ const logPaths                         = require('../lib/log-paths');
 const CONCURRENCY   = 5;
 const BOARD_TIMEOUT = 10_000;
 const DEFAULT_DISCOVER_TTL_HOURS = 6;
-const DEFAULT_DISCOVER_CANDIDATE_COUNT = 50;
+const DEFAULT_DISCOVER_CANDIDATE_COUNT = 75;
 const MIN_DISCOVER_OUTPUT_TOKENS = 2000;
 const BOOTSTRAP_THRESHOLD = 20;
-const BOOTSTRAP_PASSES = 4;
+const BOOTSTRAP_PASSES = 6;
 
 const { baseDir: profileDir } = require('../config/paths');
 
@@ -101,10 +101,8 @@ async function boardExists(platform, slug) {
       headers: { 'User-Agent': 'Mozilla/5.0' },
       signal: AbortSignal.timeout(BOARD_TIMEOUT),
     });
-    if (!res.ok) return false;
-    const data = await res.json();
-    const jobs = data?.jobs ?? (Array.isArray(data) ? data : []);
-    return jobs.length > 0;
+    // Board exists = slug is valid; active jobs are not required (they'll be scraped each refresh)
+    return res.ok;
   } catch {
     return false;
   }
