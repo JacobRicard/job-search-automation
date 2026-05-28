@@ -644,7 +644,8 @@ function wizardDone() {
       .then(function (d) {
         if (!d || typeof d.unscored !== 'number') return;
         if (initialScored === null) initialScored = d.scored;
-        if (d.unscored === 0) {
+        // Genuinely done: some jobs scored, none left to score.
+        if (d.scored > 0 && d.unscored === 0) {
           banner.style.display = 'none';
           if (!reloadedOnce && d.scored > initialScored) {
             reloadedOnce = true;
@@ -654,8 +655,10 @@ function wizardDone() {
         }
         var pct = d.total > 0 ? Math.round((d.scored / d.total) * 100) : 0;
         var stateLabel;
-        if (d.scored === 0 && !d.active) {
-          stateLabel = 'Setting up your first job search — importing companies and job boards in the background.';
+        if (d.total === 0) {
+          stateLabel = 'Setting up your first job search — discovering companies and scraping job boards in the background. First jobs usually appear within 2–3 minutes.';
+        } else if (d.scored === 0 && !d.active) {
+          stateLabel = d.total + ' jobs imported. Scoring is about to start…';
         } else if (d.scored === 0) {
           stateLabel = 'Scoring your first jobs against your resume… (ETA ' + formatEta(d.etaSeconds) + ')';
         } else {
