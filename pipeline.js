@@ -31,7 +31,7 @@ const { getHistoricalStageStats } = require('./lib/stage-stats');
 const logPaths = require('./lib/log-paths');
 const log = require('./lib/logger')('pipeline', { logFile: logPaths.daily('pipeline') });
 
-const DEFAULT_SCORE_SPIKE_THRESHOLD = 50;
+const DEFAULT_SCORE_SPIKE_THRESHOLD = 200;
 
 function envFlag(value) {
   return value === '1' || String(value).toLowerCase() === 'true';

@@ -329,12 +329,16 @@ document.getElementById('jd-modal').addEventListener('click', e => {
 // ---------------------------------------------------------------------------
 
 var _wizardStep = 0;
+var _wizardHasKey = false;
 
 (function initWizard() {
   if (!window.__FIRST_RUN__) return;
   if (localStorage.getItem('jsa_setup_done')) return;
 
-  fetch('/api/setup/status').catch(function() {});
+  fetch('/api/setup/status')
+    .then(function(r) { return r.json(); })
+    .then(function(data) { if (data && data.hasKey) _wizardHasKey = true; })
+    .catch(function() {});
 
   var overlay = document.getElementById('onboarding-wizard');
   if (overlay) overlay.classList.add('open');
@@ -352,9 +356,21 @@ function wizardGoTo(step) {
     el.classList.toggle('done', i < step);
   });
   _wizardStep = step;
+  if (step === 2) { wizardUpdateResumeHint(); }
   // Kick off pipeline when reaching the Done step (last step)
   if (step === totalSteps - 1) {
     wizardKickoffPipeline();
+  }
+}
+
+function wizardUpdateResumeHint() {
+  var status = document.getElementById('wizard-resume-status');
+  if (!status) return;
+  if (!_wizardHasKey) {
+    status.textContent = 'Enter your Gemini API key in step 1 to upload PDFs, or upload a .txt file.';
+    status.style.color = 'var(--text-muted)';
+  } else {
+    status.textContent = '';
   }
 }
 
@@ -422,8 +438,13 @@ function wizardSaveKey() {
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ key: key.trim() }),
   })
-    .catch(function() {})
-    .finally(function() {
+    .then(function(r) { return r.json(); })
+    .then(function(data) {
+      _wizardHasKey = !!(data && data.ok);
+      if (saveBtn) saveBtn.disabled = false;
+      wizardNext();
+    })
+    .catch(function() {
       if (saveBtn) saveBtn.disabled = false;
       wizardNext();
     });

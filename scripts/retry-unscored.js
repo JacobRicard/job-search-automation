@@ -13,7 +13,7 @@ const { scoreJob } = require('../scorer');
 const logPaths = require('../lib/log-paths');
 const log = require('../lib/logger')('score-retry', { logFile: logPaths.daily('retry-unscored') });
 
-const DEFAULT_LIMIT = 25;
+const DEFAULT_LIMIT = 100;
 
 function parseLimit(argv) {
   const arg = argv.find((value) => value.startsWith('--limit='));
