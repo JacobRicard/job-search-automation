@@ -28,6 +28,12 @@ const { isPrimaryPlatform } = require('./lib/ats-resolver');
 const { jobLeadToInternal, validateWithPydantic } = require('./lib/job-lead');
 const { normalizeScrapedJobs } = require('./scripts/resolve-ats-aliases');
 const { getHistoricalStageStats } = require('./lib/stage-stats');
+const { mapConcurrent } = require('./lib/concurrency');
+
+// Score multiple jobs in flight at once. Throughput is still bounded by the
+// Gemini slot reservation (GEMINI_RATE_DELAY_MS); concurrency only overlaps
+// network latency so it doesn't add on top of the pacing.
+const SCORING_CONCURRENCY = parseInt(process.env.SCORING_CONCURRENCY, 10) || 3;
 const logPaths = require('./lib/log-paths');
 const log = require('./lib/logger')('pipeline', { logFile: logPaths.daily('pipeline') });
 
@@ -259,10 +265,11 @@ async function run() {
   let quotaExhausted = false;
   let processed = 0;
 
-  for (let i = 0; i < toScore.length; i++) {
-    const job = toScore[i];
+  await mapConcurrent(toScore, SCORING_CONCURRENCY, async (job) => {
+    // Once quota is exhausted, drain the remaining workers without spending
+    // more calls (replaces the old loop `break`).
+    if (quotaExhausted) return;
     markJobScoreAttempt(db, job.id);
-    processed = i + 1;
 
     try {
       const { score, reasoning } = await scoreJob(job);
@@ -272,7 +279,7 @@ async function run() {
         markJobScoreFailure(db, job.id, error);
         scoredFailed++;
         log.error('Scoring failed', { title: job.title, error });
-        if (QUOTA_RE.test(error)) { quotaExhausted = true; break; }
+        if (QUOTA_RE.test(error)) quotaExhausted = true;
       } else {
         updateJobScore(db, job.id, score, reasoning);
         scoredOk++;
@@ -282,10 +289,10 @@ async function run() {
       markJobScoreFailure(db, job.id, e.message);
       scoredFailed++;
       log.error('Scoring failed', { title: job.title, error: e.message });
-      if (QUOTA_RE.test(e.message || '')) { quotaExhausted = true; break; }
+      if (QUOTA_RE.test(e.message || '')) quotaExhausted = true;
     }
 
-    const done = processed;
+    const done = ++processed;
     if (done === scoreTotal || done % progressEvery === 0) {
       const elapsedSec = Math.round((Date.now() - scoreStartedAt) / 1000);
       const remaining = scoreTotal - done;
@@ -299,7 +306,7 @@ async function run() {
         etaSec,
       });
     }
-  }
+  });
 
   if (quotaExhausted) {
     const remaining = scoreTotal - processed;

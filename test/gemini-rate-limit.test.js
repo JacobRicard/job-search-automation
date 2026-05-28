@@ -28,10 +28,10 @@ describe('Gemini rate limit configuration', () => {
     delete require.cache[constantsPath];
   });
 
-  it('defaults to a conservative 5 second request gap', () => {
+  it('defaults to the 15 RPM free-tier ceiling of a 4 second request gap', () => {
     const constants = loadConstantsWithEnv(null);
 
-    assert.equal(constants.GEMINI_RATE_DELAY_MS, 5000);
+    assert.equal(constants.GEMINI_RATE_DELAY_MS, 4000);
   });
 
   it('accepts a positive env override', () => {
@@ -41,10 +41,10 @@ describe('Gemini rate limit configuration', () => {
   });
 
   it('falls back for invalid env values', () => {
-    assert.equal(loadConstantsWithEnv('0').GEMINI_RATE_DELAY_MS, 5000);
-    assert.equal(loadConstantsWithEnv('-10').GEMINI_RATE_DELAY_MS, 5000);
-    assert.equal(loadConstantsWithEnv('5000ms').GEMINI_RATE_DELAY_MS, 5000);
-    assert.equal(loadConstantsWithEnv('not-a-number').GEMINI_RATE_DELAY_MS, 5000);
+    assert.equal(loadConstantsWithEnv('0').GEMINI_RATE_DELAY_MS, 4000);
+    assert.equal(loadConstantsWithEnv('-10').GEMINI_RATE_DELAY_MS, 4000);
+    assert.equal(loadConstantsWithEnv('5000ms').GEMINI_RATE_DELAY_MS, 4000);
+    assert.equal(loadConstantsWithEnv('not-a-number').GEMINI_RATE_DELAY_MS, 4000);
   });
 });
 
