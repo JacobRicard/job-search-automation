@@ -543,9 +543,26 @@ function wizardSaveResume() {
   }
 }
 
+function wizardValidateProfile() {
+  var btn = document.getElementById('wizard-profile-save-btn');
+  if (!btn) return;
+  var titles = ((document.getElementById('wizard-titles') || {}).value || '').trim();
+  var stack = ((document.getElementById('wizard-stack') || {}).value || '').trim();
+  btn.disabled = !(titles && stack);
+}
+
 function wizardAutoFillTargets() {
   var autofillStatus = document.getElementById('wizard-autofill-status');
+  var saveBtn = document.getElementById('wizard-profile-save-btn');
+  if (saveBtn) saveBtn.disabled = true;
   if (autofillStatus) { autofillStatus.textContent = 'Analyzing resume...'; autofillStatus.style.color = 'var(--text-muted)'; }
+  ['wizard-titles', 'wizard-stack'].forEach(function(id) {
+    var el = document.getElementById(id);
+    if (el && !el.__wizardListenerAttached) {
+      el.addEventListener('input', wizardValidateProfile);
+      el.__wizardListenerAttached = true;
+    }
+  });
   fetch('/api/setup/extract-profile', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{}' })
     .then(function(r) { return r.json(); })
     .then(function(data) {
@@ -556,12 +573,13 @@ function wizardAutoFillTargets() {
         if (data.industry) { window.__wizardIndustry = data.industry; }
         if (autofillStatus) { autofillStatus.textContent = 'Auto-filled from your resume. Edit as needed.'; autofillStatus.style.color = 'var(--green)'; }
       } else {
-        if (autofillStatus) { autofillStatus.textContent = ''; }
+        if (autofillStatus) { autofillStatus.textContent = 'Could not auto-fill. Enter at least one target title and one tech-stack item to continue.'; autofillStatus.style.color = 'var(--text-muted)'; }
       }
     })
     .catch(function() {
-      if (autofillStatus) { autofillStatus.textContent = ''; }
-    });
+      if (autofillStatus) { autofillStatus.textContent = 'Auto-fill failed. Enter at least one target title and one tech-stack item to continue.'; autofillStatus.style.color = 'var(--text-muted)'; }
+    })
+    .finally(wizardValidateProfile);
 }
 
 function wizardSaveProfile() {
