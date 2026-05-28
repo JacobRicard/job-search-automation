@@ -39,16 +39,16 @@ function envFlag(value) {
 
 function getScoringPlan(candidates, env = process.env, { firstRun = false } = {}) {
   const threshold = parseInt(env.SCORE_SPIKE_THRESHOLD, 10) || DEFAULT_SCORE_SPIKE_THRESHOLD;
-  const allowSpike = envFlag(env.ALLOW_SCORE_SPIKE) || firstRun;
-  const skipForSpike = candidates.length > threshold && !allowSpike;
+  const spikeDetected = candidates.length > threshold;
 
   return {
     threshold,
-    allowSpike,
+    allowSpike: true,
     firstRun,
-    skipForSpike,
+    skipForSpike: false,
+    spikeDetected,
     candidates: candidates.length,
-    jobs: skipForSpike ? [] : candidates,
+    jobs: candidates,
   };
 }
 
@@ -222,12 +222,14 @@ async function run() {
   ).get(todayStr, MODEL).n;
   const remainingQuota = Math.max(0, GEMINI_DAILY_LIMIT - usedToday - 10); // reserve 10 for summary + retries
   const scoringCandidates = getUnscoredJobs(db, { limit: remainingQuota });
-  const firstRun = db.prepare("SELECT COUNT(*) AS n FROM jobs WHERE score IS NOT NULL").get().n === 0;
+  const firstRun = db.prepare("SELECT COUNT(*) AS n FROM jobs WHERE score IS NOT NULL").get().n < 10;
   const scoringPlan = getScoringPlan(scoringCandidates, process.env, { firstRun });
-  if (firstRun && scoringCandidates.length > (parseInt(process.env.SCORE_SPIKE_THRESHOLD, 10) || DEFAULT_SCORE_SPIKE_THRESHOLD)) {
-    log.info('First-run scoring: spike guard bypassed', {
+  if (scoringPlan.spikeDetected) {
+    log.info('High scoring volume (daily quota still caps the batch)', {
       candidates: scoringCandidates.length,
+      threshold: scoringPlan.threshold,
       remainingQuota,
+      firstRun,
     });
   }
   const toScore = scoringPlan.jobs;
@@ -237,13 +239,6 @@ async function run() {
       remainingQuota,
       toScore: scoringCandidates.length,
       scoringQueued: toScore.length,
-    });
-  }
-  if (scoringPlan.skipForSpike) {
-    log.warn('Scoring spike guard tripped', {
-      candidates: scoringPlan.candidates,
-      threshold: scoringPlan.threshold,
-      allowOverride: 'ALLOW_SCORE_SPIKE=1',
     });
   }
 
