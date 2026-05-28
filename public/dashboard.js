@@ -638,11 +638,25 @@ function wizardDone() {
     return '~' + hrs + ' hr';
   }
 
+  function updateApiCounter(used) {
+    if (typeof used !== 'number') return;
+    var usedEl = document.getElementById('api-indicator-used');
+    if (!usedEl) return;
+    if (parseInt(usedEl.textContent, 10) === used) return;
+    usedEl.textContent = used;
+    var wrap = document.getElementById('api-indicator');
+    var limit = parseInt((wrap && wrap.dataset.limit) || '500', 10);
+    if (wrap && limit > 0) {
+      wrap.style.color = used > limit * 0.8 ? '#ef4444' : '';
+    }
+  }
+
   function poll() {
     fetch('/api/scoring-progress')
       .then(function (r) { return r.json(); })
       .then(function (d) {
         if (!d || typeof d.unscored !== 'number') return;
+        updateApiCounter(d.apiUsed);
         if (initialScored === null) initialScored = d.scored;
         // Genuinely done: some jobs scored, none left to score.
         if (d.scored > 0 && d.unscored === 0) {
@@ -655,7 +669,9 @@ function wizardDone() {
         }
         var pct = d.total > 0 ? Math.round((d.scored / d.total) * 100) : 0;
         var stateLabel;
-        if (d.total === 0) {
+        if (d.quotaExhausted) {
+          stateLabel = 'Daily Gemini quota reached. Scored ' + d.scored + ' of ' + d.total + ' jobs so far — remaining ' + d.unscored + ' will be picked up automatically once the quota resets (~24h).';
+        } else if (d.total === 0) {
           stateLabel = 'Setting up your first job search — discovering companies and scraping job boards in the background. First jobs usually appear within 2–3 minutes.';
         } else if (d.scored === 0 && !d.active) {
           stateLabel = d.total + ' jobs imported. Scoring is about to start…';

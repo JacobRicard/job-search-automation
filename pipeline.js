@@ -255,9 +255,14 @@ async function run() {
     log.info('Scoring started', { total: scoreTotal });
   }
 
+  const QUOTA_RE = /exceeded your current quota|RESOURCE_EXHAUSTED|quota.*exceeded|billing.*quota/i;
+  let quotaExhausted = false;
+  let processed = 0;
+
   for (let i = 0; i < toScore.length; i++) {
     const job = toScore[i];
     markJobScoreAttempt(db, job.id);
+    processed = i + 1;
 
     try {
       const { score, reasoning } = await scoreJob(job);
@@ -267,6 +272,7 @@ async function run() {
         markJobScoreFailure(db, job.id, error);
         scoredFailed++;
         log.error('Scoring failed', { title: job.title, error });
+        if (QUOTA_RE.test(error)) { quotaExhausted = true; break; }
       } else {
         updateJobScore(db, job.id, score, reasoning);
         scoredOk++;
@@ -276,9 +282,10 @@ async function run() {
       markJobScoreFailure(db, job.id, e.message);
       scoredFailed++;
       log.error('Scoring failed', { title: job.title, error: e.message });
+      if (QUOTA_RE.test(e.message || '')) { quotaExhausted = true; break; }
     }
 
-    const done = i + 1;
+    const done = processed;
     if (done === scoreTotal || done % progressEvery === 0) {
       const elapsedSec = Math.round((Date.now() - scoreStartedAt) / 1000);
       const remaining = scoreTotal - done;
@@ -292,6 +299,17 @@ async function run() {
         etaSec,
       });
     }
+  }
+
+  if (quotaExhausted) {
+    const remaining = scoreTotal - processed;
+    log.warn('Gemini daily quota exhausted; stopping scoring loop early', {
+      scoredOk,
+      scoredFailed,
+      processed,
+      remaining,
+      hint: 'Remaining jobs will be picked up by the next pipeline run after the quota resets (~24h).',
+    });
   }
 
   // Classify application complexity for scored jobs (any non-archived status)
