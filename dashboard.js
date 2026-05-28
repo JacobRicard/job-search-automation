@@ -183,7 +183,22 @@ const server = http.createServer(async (req, res) => {
   // API routes
   const handler = routes[`${req.method} ${url.pathname}`];
   if (handler) {
-    await handler(req, res, db, url);
+    try {
+      await handler(req, res, db, url);
+    } catch (e) {
+      log.error('Route handler threw', {
+        method: req.method,
+        path: url.pathname,
+        error: e.message,
+        stack: e.stack,
+      });
+      if (!res.headersSent) {
+        res.writeHead(500, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ error: 'Internal server error' }));
+      } else {
+        res.destroy();
+      }
+    }
     const duration = (Date.now() - start) / 1000;
     metrics.httpRequestsTotal.inc({ method: req.method, path: url.pathname, status: res.statusCode });
     metrics.httpRequestDuration.observe({ method: req.method, path: url.pathname }, duration);
@@ -192,6 +207,22 @@ const server = http.createServer(async (req, res) => {
 
   res.writeHead(404);
   res.end('not found');
+});
+
+server.on('clientError', (err, socket) => {
+  log.warn('HTTP clientError', { error: err.message });
+  if (socket.writable) socket.end('HTTP/1.1 400 Bad Request\r\n\r\n');
+});
+
+process.on('uncaughtException', (err) => {
+  log.error('uncaughtException', { error: err.message, stack: err.stack });
+});
+
+process.on('unhandledRejection', (reason) => {
+  log.error('unhandledRejection', {
+    error: reason instanceof Error ? reason.message : String(reason),
+    stack: reason instanceof Error ? reason.stack : undefined,
+  });
 });
 
 server.listen(PORT, '0.0.0.0', () => {
