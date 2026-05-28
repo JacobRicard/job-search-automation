@@ -5,6 +5,7 @@ services:
       - "${DASHBOARD_PORT:-3131}:${DASHBOARD_PORT:-3131}"
     volumes:
       - ./data:/app/data
+      - ./logs:/app/logs
       - ./.env:/app/.env
     env_file: .env
     restart: unless-stopped
@@ -25,6 +26,7 @@ services:
     build: .
     volumes:
       - ./data:/app/data
+      - ./logs:/app/logs
     env_file: .env
     depends_on:
       dashboard:
