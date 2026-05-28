@@ -15,7 +15,7 @@ const { loadDashboardEnv } = require('../lib/env');
 const repoRoot = path.resolve(__dirname, '..');
 loadDashboardEnv(repoRoot);
 
-const { SEARCH_TERMS, GREENHOUSE_COMPANIES, ASHBY_COMPANIES, LEVER_COMPANIES } = require('../config/companies');
+const { SEARCH_TERMS, GREENHOUSE_COMPANIES, ASHBY_COMPANIES, LEVER_COMPANIES, WORKDAY_COMPANIES } = require('../config/companies');
 const { callGemini }                   = require('../lib/gemini');
 const { parseGeminiJsonArray }              = require('../lib/ats-resolver');
 const { loadSuggested, saveSuggested, allSlugs } = require('../lib/suggested-companies');
@@ -108,6 +108,30 @@ async function boardExists(platform, slug) {
   }
 }
 
+// Resolves a Workday subdomain to a full {sub, wd, board, label} entry by
+// probing wd1..wd5 and parsing the board from the redirect URL.
+async function resolveWorkdayBoard(sub, label) {
+  for (let wd = 1; wd <= 5; wd++) {
+    const url = `https://${sub}.wd${wd}.myworkdayjobs.com/`;
+    try {
+      const res = await fetch(url, {
+        headers: { 'User-Agent': 'Mozilla/5.0' },
+        redirect: 'follow',
+        signal: AbortSignal.timeout(BOARD_TIMEOUT),
+      });
+      if (!res.ok) continue;
+      const finalUrl = res.url || '';
+      const m = finalUrl.match(/\/[a-z]{2}-[A-Z]{2}\/([^/?#]+)/);
+      if (m && m[1]) {
+        return { sub, wd, board: m[1], label: label || sub };
+      }
+    } catch {
+      // try next wd cluster
+    }
+  }
+  return null;
+}
+
 // ---------------------------------------------------------------------------
 // Concurrency helper
 // ---------------------------------------------------------------------------
@@ -129,11 +153,27 @@ async function mapConcurrent(items, limit, fn) {
 // Gemini prompt
 // ---------------------------------------------------------------------------
 
+function isTechProfile(contextSnippet) {
+  if (!contextSnippet) return true;
+  const m = contextSnippet.match(/##\s*Industry\s*\n+([^\n]+)/i);
+  if (!m) return true;
+  return m[1].trim().toLowerCase() === 'tech';
+}
+
 function buildPrompt(existingSlugs, contextSnippet, candidateCount = DEFAULT_DISCOVER_CANDIDATE_COUNT) {
   const excludeList = [...existingSlugs].slice(0, 300).join(', ');
   const contextSection = contextSnippet
     ? 'Job seeker context:\n' + contextSnippet + '\n\n'
     : '';
+  const allowWorkday = !isTechProfile(contextSnippet);
+  const platformsLabel = allowWorkday ? 'Greenhouse|Ashby|Lever|Workday' : 'Greenhouse|Ashby|Lever';
+  const platformRule = allowWorkday
+    ? '- Only use Greenhouse, Ashby, Lever, or Workday as the platform (these have public APIs)\n'
+      + '- For Greenhouse/Ashby/Lever: "slug" is the company\'s ATS board token (e.g. "stripe", "cloudflare", "linear")\n'
+      + '- For Workday: "slug" is the Workday tenant subdomain (e.g. "goldmansachs", "jpmc" — the part before .wdN.myworkdayjobs.com)\n'
+      + '- Prefer Workday for large banks, asset managers, insurers, and Fortune 500 enterprises\n'
+    : '- Only use Greenhouse, Ashby, or Lever as the platform (these have public APIs)\n'
+      + '- "slug" is the company\'s ATS board token (e.g. "stripe", "cloudflare", "linear")\n';
   return 'You are helping a job seeker find companies that are actively hiring.\n\n'
     + contextSection
     + 'I already track these company board slugs (do NOT suggest any of them):\n'
@@ -141,10 +181,9 @@ function buildPrompt(existingSlugs, contextSnippet, candidateCount = DEFAULT_DIS
     + 'Suggest ' + candidateCount + ' NEW companies likely to have open roles matching these search terms:\n'
     + SEARCH_TERMS.join(', ') + '\n\n'
     + 'Return strict JSON only — no markdown, no explanation:\n'
-    + '[{"name":"Company Name","platform":"Greenhouse|Ashby|Lever","slug":"board-slug","rationale":"1 sentence"}]\n\n'
+    + '[{"name":"Company Name","platform":"' + platformsLabel + '","slug":"board-slug","rationale":"1 sentence"}]\n\n'
     + 'Rules:\n'
-    + '- Only use Greenhouse, Ashby, or Lever as the platform (these have public APIs)\n'
-    + '- "slug" is the company\'s ATS board token (e.g. "stripe", "cloudflare", "linear")\n'
+    + platformRule
     + '- Focus on companies likely to have open roles matching the search terms above\n'
     + '- No consulting firms, staffing agencies, or companies that only hire through LinkedIn/Indeed\n'
     + '- Return exactly ' + candidateCount + ' candidates';
@@ -183,6 +222,11 @@ async function runDiscoveryPass(suggested, staticSlugs, contextSnippet, candidat
   const verifyResults = await mapConcurrent(novel, CONCURRENCY, async (c) => {
     const slug = c.slug.toLowerCase();
     const platform = c.platform.toLowerCase();
+    if (platform === 'workday') {
+      const entry = await resolveWorkdayBoard(slug, c.name);
+      log.debug('Workday board check', { slug, resolved: !!entry, wd: entry?.wd, board: entry?.board });
+      return { ...c, slug, platform, exists: !!entry, workdayEntry: entry };
+    }
     const exists = await boardExists(platform, slug);
     log.debug('Board check', { slug, platform, exists });
     return { ...c, slug, platform, exists };
@@ -197,6 +241,7 @@ async function runDiscoveryPass(suggested, staticSlugs, contextSnippet, candidat
     log.debug('Boards not found', { slugs: failed.map((c) => c.platform + ':' + c.slug) });
   }
 
+  const workdaySubs = new Set((suggested.workday || []).map(e => e && e.sub).filter(Boolean));
   for (const c of verified) {
     if (c.platform === 'greenhouse' && !suggested.greenhouse.includes(c.slug)) {
       suggested.greenhouse.push(c.slug);
@@ -207,6 +252,11 @@ async function runDiscoveryPass(suggested, staticSlugs, contextSnippet, candidat
     } else if (c.platform === 'lever' && !suggested.lever.includes(c.slug)) {
       suggested.lever.push(c.slug);
       log.info('Added to Lever list', { slug: c.slug, name: c.name, rationale: c.rationale });
+    } else if (c.platform === 'workday' && c.workdayEntry && !workdaySubs.has(c.workdayEntry.sub)) {
+      suggested.workday = suggested.workday || [];
+      suggested.workday.push(c.workdayEntry);
+      workdaySubs.add(c.workdayEntry.sub);
+      log.info('Added to Workday list', { sub: c.workdayEntry.sub, wd: c.workdayEntry.wd, board: c.workdayEntry.board, name: c.name, rationale: c.rationale });
     }
   }
 
@@ -230,6 +280,7 @@ async function main() {
     ...GREENHOUSE_COMPANIES,
     ...ASHBY_COMPANIES,
     ...LEVER_COMPANIES,
+    ...((WORKDAY_COMPANIES || []).map(e => e && e.sub).filter(Boolean)),
   ]);
 
   const suggested = loadSuggested(profileDir);

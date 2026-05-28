@@ -553,6 +553,7 @@ function wizardAutoFillTargets() {
         if (data.titles)  { var el = document.getElementById('wizard-titles');  if (el) el.value = data.titles; }
         if (data.stack)   { var el = document.getElementById('wizard-stack');   if (el) el.value = data.stack;  }
         if (data.salary)  { var el = document.getElementById('wizard-salary');  if (el) el.value = data.salary; }
+        if (data.industry) { window.__wizardIndustry = data.industry; }
         if (autofillStatus) { autofillStatus.textContent = 'Auto-filled from your resume. Edit as needed.'; autofillStatus.style.color = 'var(--green)'; }
       } else {
         if (autofillStatus) { autofillStatus.textContent = ''; }
@@ -568,10 +569,11 @@ function wizardSaveProfile() {
   var stack = (document.getElementById('wizard-stack') || {}).value || '';
   var salary = (document.getElementById('wizard-salary') || {}).value || '';
   var location = (document.getElementById('wizard-location') || {}).value || '';
+  var industry = window.__wizardIndustry || '';
   fetch('/api/setup/profile', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ titles: titles, stack: stack, salary: salary, location: location }),
+    body: JSON.stringify({ titles: titles, stack: stack, salary: salary, location: location, industry: industry }),
   })
     .catch(function() {})
     .finally(function() { wizardNext(); });

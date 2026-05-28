@@ -37,14 +37,15 @@ function envFlag(value) {
   return value === '1' || String(value).toLowerCase() === 'true';
 }
 
-function getScoringPlan(candidates, env = process.env) {
+function getScoringPlan(candidates, env = process.env, { firstRun = false } = {}) {
   const threshold = parseInt(env.SCORE_SPIKE_THRESHOLD, 10) || DEFAULT_SCORE_SPIKE_THRESHOLD;
-  const allowSpike = envFlag(env.ALLOW_SCORE_SPIKE);
+  const allowSpike = envFlag(env.ALLOW_SCORE_SPIKE) || firstRun;
   const skipForSpike = candidates.length > threshold && !allowSpike;
 
   return {
     threshold,
     allowSpike,
+    firstRun,
     skipForSpike,
     candidates: candidates.length,
     jobs: skipForSpike ? [] : candidates,
@@ -221,7 +222,14 @@ async function run() {
   ).get(todayStr, MODEL).n;
   const remainingQuota = Math.max(0, GEMINI_DAILY_LIMIT - usedToday - 10); // reserve 10 for summary + retries
   const scoringCandidates = getUnscoredJobs(db, { limit: remainingQuota });
-  const scoringPlan = getScoringPlan(scoringCandidates);
+  const firstRun = db.prepare("SELECT COUNT(*) AS n FROM jobs WHERE score IS NOT NULL").get().n === 0;
+  const scoringPlan = getScoringPlan(scoringCandidates, process.env, { firstRun });
+  if (firstRun && scoringCandidates.length > (parseInt(process.env.SCORE_SPIKE_THRESHOLD, 10) || DEFAULT_SCORE_SPIKE_THRESHOLD)) {
+    log.info('First-run scoring: spike guard bypassed', {
+      candidates: scoringCandidates.length,
+      remainingQuota,
+    });
+  }
   const toScore = scoringPlan.jobs;
   if (usedToday > 0 || remainingQuota < GEMINI_DAILY_LIMIT) {
     log.info('Daily quota check', {
