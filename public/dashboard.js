@@ -631,11 +631,10 @@ function wizardDone() {
   var reloadedOnce = false;
 
   function formatEta(seconds) {
-    if (!seconds || seconds < 60) return 'about a minute';
-    var mins = Math.round(seconds / 60);
-    if (mins < 60) return '~' + mins + ' min';
-    var hrs = Math.round(mins / 10) / 6;
-    return '~' + hrs + ' hr';
+    function pad2(n) { return (n < 10 ? '0' : '') + n; }
+    if (typeof seconds !== 'number' || !isFinite(seconds) || seconds <= 0) return '~00:01';
+    var totalMinutes = Math.max(1, Math.ceil(seconds / 60));
+    return '~' + pad2(Math.floor(totalMinutes / 60)) + ':' + pad2(totalMinutes % 60);
   }
 
   function updateApiCounter(used) {
