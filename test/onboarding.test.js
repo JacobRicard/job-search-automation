@@ -349,6 +349,63 @@ describe('setup HTTP handlers', () => {
     assert.equal(body.ok, false);
     assert.equal(body.error, 'No key provided');
   });
+
+  // --- regression: wizard PDF upload showed "no_key" even after key was saved ---
+
+  it('POST /api/setup/resume with pdf format returns no_key when GEMINI_API_KEY is not set', async () => {
+    delete process.env.GEMINI_API_KEY;
+    const { status, body } = await post(port, '/api/setup/resume', { content: 'dGVzdA==', format: 'pdf' });
+    assert.equal(status, 400);
+    assert.equal(body.ok, false);
+    assert.equal(body.error, 'no_key');
+  });
+
+  it('POST /api/setup/api-key sets process.env.GEMINI_API_KEY immediately for subsequent requests', async () => {
+    delete process.env.GEMINI_API_KEY;
+    const { status, body } = await post(port, '/api/setup/api-key', { key: 'AIzaSyRuntimeTestKey' });
+    assert.equal(status, 200);
+    assert.equal(body.ok, true);
+    assert.equal(process.env.GEMINI_API_KEY, 'AIzaSyRuntimeTestKey');
+    delete process.env.GEMINI_API_KEY;
+  });
+
+  it('GET /api/setup/status returns hasKey true immediately after saving key via api-key endpoint', async () => {
+    delete process.env.GEMINI_API_KEY;
+    await post(port, '/api/setup/api-key', { key: 'AIzaSySequenceKey' });
+    const { body } = await get(port, '/api/setup/status');
+    assert.equal(body.hasKey, true);
+    delete process.env.GEMINI_API_KEY;
+  });
+
+  it('POST /api/setup/resume with pdf format does not return no_key after key is saved', async () => {
+    delete process.env.GEMINI_API_KEY;
+    await post(port, '/api/setup/api-key', { key: 'AIzaSyAfterSaveKey' });
+    // Key is now set — PDF upload should fail for a real reason (invalid key/content),
+    // but NOT with no_key (the gate that was incorrectly blocking the wizard)
+    const { body } = await post(port, '/api/setup/resume', { content: 'dGVzdA==', format: 'pdf' });
+    assert.notEqual(body.error, 'no_key');
+    delete process.env.GEMINI_API_KEY;
+  });
+
+  it('POST /api/setup/api-key trims whitespace before saving', async () => {
+    delete process.env.GEMINI_API_KEY;
+    await post(port, '/api/setup/api-key', { key: '  AIzaSyTrimTest  ' });
+    assert.equal(process.env.GEMINI_API_KEY, 'AIzaSyTrimTest');
+    const content = fs.readFileSync(envPath, 'utf8');
+    assert.ok(content.includes('GEMINI_API_KEY=AIzaSyTrimTest'));
+    assert.ok(!content.includes(' AIzaSyTrimTest'));
+    delete process.env.GEMINI_API_KEY;
+  });
+
+  it('POST /api/setup/api-key with whitespace-only key does not save', async () => {
+    delete process.env.GEMINI_API_KEY;
+    fs.writeFileSync(envPath, 'EXISTING=keep\n', 'utf8');
+    await post(port, '/api/setup/api-key', { key: '   ' });
+    assert.equal(process.env.GEMINI_API_KEY, undefined);
+    const content = fs.readFileSync(envPath, 'utf8');
+    assert.ok(!content.includes('GEMINI_API_KEY'));
+    assert.ok(content.includes('EXISTING=keep'));
+  });
 });
 
 // ---------------------------------------------------------------------------
