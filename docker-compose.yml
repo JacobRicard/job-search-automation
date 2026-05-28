@@ -5,9 +5,13 @@ services:
       - "${DASHBOARD_PORT:-3131}:${DASHBOARD_PORT:-3131}"
     volumes:
       - ./data:/app/data
+      - job_search_db:/app/db
       - ./logs:/app/logs
       - ./.env:/app/.env
     env_file: .env
+    environment:
+      DATA_DIR: /app/data
+      DB_DIR: /app/db
     restart: unless-stopped
     healthcheck:
       test:
@@ -26,11 +30,18 @@ services:
     build: .
     volumes:
       - ./data:/app/data
+      - job_search_db:/app/db
       - ./logs:/app/logs
       - ./.env:/app/.env
     env_file: .env
+    environment:
+      DATA_DIR: /app/data
+      DB_DIR: /app/db
     depends_on:
       dashboard:
         condition: service_healthy
     command: ["/bin/sh", "scripts/docker-worker.sh"]
     restart: unless-stopped
+
+volumes:
+  job_search_db:

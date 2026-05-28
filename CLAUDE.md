@@ -48,7 +48,7 @@ The following commands are available in both Claude Code (`.claude/commands/`) a
 | `/app-questions [question text]` | Answer application form questions in the applicant's voice. |
 | `/save-context` | End of session. Persist anything learned back to `.context/`. |
 
-All commands read profile files from `data/` and the database from `data/jobs.db`.
+All commands read profile files from `data/`. In Docker, SQLite lives in the named volume mounted at `/app/db`; outside Docker it falls back to `data/jobs.db`.
 
 ## Git workflow
 
@@ -58,7 +58,7 @@ Commit message format: `<type>: <brief summary>` — types: `feat`, `fix`, `refa
 
 **Never commit:**
 - `jobs.json` (auto-generated)
-- `jobs.db` (per-profile SQLite)
+- `jobs.db` (per-profile SQLite, local fallback only)
 - `.env` files
 - Auto-generated build artifacts (`*.pdf`)
 - `market-research-cache.json`, `slug-health.json`, or any `*-cache.json`
