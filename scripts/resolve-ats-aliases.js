@@ -15,6 +15,9 @@ const {
   isPrimaryPlatform,
   resolveAlternateJob,
 } = require('../lib/ats-resolver');
+const { mapConcurrent } = require('../lib/concurrency');
+
+const ATS_CONCURRENCY = parseInt(process.env.ATS_CONCURRENCY, 10) || 5;
 
 function parseArgs(argv) {
   return {
@@ -126,50 +129,51 @@ function dedupeNormalizedJobs(jobs, report) {
   return [...byKey.values()];
 }
 
+// Resolve one job to { normalizedJob, reportEntry }. Each resolution is
+// independent network I/O, so callers run these through a bounded worker pool.
+async function resolveOne(job, options) {
+  if (isPrimaryPlatform(job.platform)) {
+    return { normalizedJob: job, reportEntry: null };
+  }
+
+  const resolution = await resolveAlternateJob(job, options);
+  const base = {
+    id: job.id,
+    platform: job.platform,
+    title: job.title,
+    company: job.company,
+    evidence: formatEvidence(resolution.evidence),
+  };
+
+  if (resolution.status === 'primary' && resolution.job) {
+    return {
+      normalizedJob: resolution.job,
+      reportEntry: { ...base, action: 'canonicalized', resolvedPlatform: resolution.platform },
+    };
+  }
+  if (resolution.status === 'unsupported') {
+    return {
+      normalizedJob: null,
+      reportEntry: { ...base, action: 'skipped-unsupported', resolvedPlatform: '' },
+    };
+  }
+  return {
+    normalizedJob: job,
+    reportEntry: { ...base, action: 'unresolved', resolvedPlatform: '' },
+  };
+}
+
 async function normalizeScrapedJobs(jobs, options = {}) {
+  const concurrency = options.concurrency || ATS_CONCURRENCY;
+  const results = await mapConcurrent(jobs, concurrency, (job) => resolveOne(job, options));
+
+  // Reassemble in input order so output is deterministic regardless of which
+  // resolution finished first.
   const normalized = [];
   const report = [];
-
-  for (const job of jobs) {
-    if (isPrimaryPlatform(job.platform)) {
-      normalized.push(job);
-      continue;
-    }
-
-    const resolution = await resolveAlternateJob(job, options);
-    if (resolution.status === 'primary' && resolution.job) {
-      normalized.push(resolution.job);
-      report.push({
-        id: job.id,
-        action: 'canonicalized',
-        platform: job.platform,
-        resolvedPlatform: resolution.platform,
-        title: job.title,
-        company: job.company,
-        evidence: formatEvidence(resolution.evidence),
-      });
-    } else if (resolution.status === 'unsupported') {
-      report.push({
-        id: job.id,
-        action: 'skipped-unsupported',
-        platform: job.platform,
-        resolvedPlatform: '',
-        title: job.title,
-        company: job.company,
-        evidence: formatEvidence(resolution.evidence),
-      });
-    } else {
-      normalized.push(job);
-      report.push({
-        id: job.id,
-        action: 'unresolved',
-        platform: job.platform,
-        resolvedPlatform: '',
-        title: job.title,
-        company: job.company,
-        evidence: formatEvidence(resolution.evidence),
-      });
-    }
+  for (const { normalizedJob, reportEntry } of results) {
+    if (normalizedJob) normalized.push(normalizedJob);
+    if (reportEntry) report.push(reportEntry);
   }
 
   const deduped = dedupeNormalizedJobs(normalized, report);
