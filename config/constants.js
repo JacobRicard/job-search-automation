@@ -5,8 +5,8 @@ function parsePositiveInteger(value, fallback) {
   return Number.isInteger(parsed) && parsed > 0 ? parsed : fallback;
 }
 
-// Gemini API rate limiting — 15 RPM free tier = 4s minimum; 4s keeps us at the limit with retry backoff as safety net
-const GEMINI_RATE_DELAY_MS = parsePositiveInteger(process.env.GEMINI_RATE_DELAY_MS, 4000);
+// Gemini API rate limiting — default below the 15 RPM free-tier ceiling.
+const GEMINI_RATE_DELAY_MS = parsePositiveInteger(process.env.GEMINI_RATE_DELAY_MS, 5000);
 const GEMINI_RETRY_BASE_DELAY_MS = 5000;
 const GEMINI_429_DELAY_MS = 30000;
 const GEMINI_MAX_RETRIES = 5;

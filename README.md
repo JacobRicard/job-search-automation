@@ -54,4 +54,5 @@ git pull
 docker compose up -d --build
 ```
 
-Your data lives in `./data` and survives restarts and rebuilds.
+Your editable profile files live in `./data` and survive restarts and rebuilds.
+The SQLite database lives in the Docker named volume `job-search-automation_job_search_db` so it stays on Docker's Linux filesystem instead of a macOS bind mount.

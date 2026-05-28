@@ -15,7 +15,7 @@ const fs = require('fs');
 const path = require('path');
 const zlib = require('zlib');
 
-const { getDb } = require('./lib/db');
+const { getDb, closeDb } = require('./lib/db');
 const { DASHBOARD_PORT } = require('./config/constants');
 const { publicDir } = require('./config/paths');
 const logPaths = require('./lib/log-paths');
@@ -130,7 +130,7 @@ function refreshGauges() {
   } catch (e) { /* metrics must never crash the server */ }
 }
 refreshGauges();
-setInterval(refreshGauges, 60_000);
+const gaugesTimer = setInterval(refreshGauges, 60_000);
 
 const server = http.createServer(async (req, res) => {
   const start = Date.now();
@@ -227,8 +227,34 @@ process.on('unhandledRejection', (reason) => {
   });
 });
 
+let shuttingDown = false;
+let rejectionEmailPoller = { stop() {} };
+function shutdown(signal) {
+  if (shuttingDown) return;
+  shuttingDown = true;
+  log.info('Dashboard shutting down', { signal });
+  clearInterval(gaugesTimer);
+  rejectionEmailPoller.stop();
+  server.close(() => {
+    try {
+      closeDb();
+    } catch (e) {
+      log.warn('Failed to close DB during shutdown', { error: e.message });
+    }
+    process.exit(0);
+  });
+  setTimeout(() => {
+    log.warn('Forcing dashboard shutdown after timeout', { signal });
+    try { closeDb(); } catch (_) { /* best effort */ }
+    process.exit(1);
+  }, 10_000).unref();
+}
+
+process.on('SIGTERM', () => shutdown('SIGTERM'));
+process.on('SIGINT', () => shutdown('SIGINT'));
+
 server.listen(PORT, '0.0.0.0', () => {
   log.info('Dashboard running', { url: `http://localhost:${PORT}` });
 });
 
-startRejectionEmailPoller(db);
+rejectionEmailPoller = startRejectionEmailPoller(db);
