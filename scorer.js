@@ -1,14 +1,17 @@
 /**
  * scorer.js
- * Uses the Gemini API to score a job listing 1–10 against resume.md and context.md.
+ * Uses the Groq API to score a job listing 1-10 against resume.md and context.md.
+ * Two-step pipeline:
+ *   Step 1 (scoreJobCoarseFilter): llama-3.1-8b-instant — PASS/FAIL relevance gate
+ *   Step 2 (scoreJob):             llama-3.3-70b-versatile — full 1-10 score with reasoning
  *
- * Requires:  GEMINI_API_KEY environment variable
+ * Requires: GROQ_API_KEY environment variable
  *
- * Usage (standalone — scores jobs from stdin JSON array):
+ * Usage (standalone):
  *   echo '[{"title":"...","company":"...","description":"..."}]' | node scorer.js
  *
  * Usage (module):
- *   const { scoreJob } = require('./scorer');
+ *   const { scoreJob, scoreJobCoarseFilter } = require('./scorer');
  */
 
 'use strict';
@@ -19,11 +22,7 @@ const path = require('path');
 const { MAX_DESCRIPTION_LENGTH } = require('./config/constants');
 const createLogger = require('./lib/logger');
 const { baseDir } = require('./config/paths');
-const { callGemini } = require('./lib/gemini');
-
-// ---------------------------------------------------------------------------
-// Helpers
-// ---------------------------------------------------------------------------
+const { callGroq, callGroqJson, GROQ_FILTER_MODEL, GROQ_SCORE_MODEL } = require('./lib/groq');
 
 function readFile(filename) {
   const filePath = path.join(baseDir, filename);
@@ -37,47 +36,96 @@ function readFile(filename) {
 let _resume = null, _context = null;
 
 // ---------------------------------------------------------------------------
+// Step 1: Coarse relevance filter
 // ---------------------------------------------------------------------------
-// Scoring
+
+/**
+ * Quickly decide if a job is clearly irrelevant using a small, fast model.
+ * Returns { pass: boolean }. Fail-open (pass=true) if no API key or on error.
+ */
+async function scoreJobCoarseFilter(job) {
+  if (!process.env.GROQ_API_KEY) return { pass: true };
+
+  if (!_context) _context = readFile('context.md');
+
+  const descSnippet = (job.description || '').slice(0, 500);
+  const prompt = `You are a job relevance filter. Given the user's preferences and dealbreakers below, respond with ONLY the word PASS or FAIL.
+
+Respond FAIL only if the job is clearly irrelevant — wrong field entirely, explicit dealbreaker from the user's context, or completely wrong seniority level. When in doubt, respond PASS.
+
+## User Context (preferences and dealbreakers)
+${_context}
+
+## Job
+Title: ${job.title}
+Company: ${job.company}
+Location: ${job.location || 'Not specified'}
+Description (first 500 chars): ${descSnippet}
+
+Respond ONLY with PASS or FAIL.`;
+
+  try {
+    const text = await callGroq(prompt, { model: GROQ_FILTER_MODEL, maxTokens: 10 });
+    const upper = text.toUpperCase().trim();
+    if (upper.includes('FAIL')) return { pass: false };
+    return { pass: true };
+  } catch (e) {
+    // Fail open — don't block scoring on a filter error
+    return { pass: true };
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Step 2: Full scoring
 // ---------------------------------------------------------------------------
 
 /**
  * Score a single job listing against the user's resume and context.
- *
- * @param {object} job - { title, company, url, platform, description, location, postedAt }
  * @returns {Promise<{ score: number, reasoning: string }>}
  */
 async function scoreJob(job) {
   if (!_resume) _resume = readFile('resume.md');
   if (!_context) _context = readFile('context.md');
-  const resume = _resume;
-  const context = _context;
-  const prompt = `You are evaluating how well a job listing matches a candidate.
+
+  const prompt = `You are evaluating how well a job listing matches a candidate. Respond with a JSON object only.
 
 ## Candidate Resume
-${resume}
+${_resume}
 
 ## Candidate Context (goals, preferences, dealbreakers)
-${context}
+${_context}
 
 ## Job Listing
-**Title:** ${job.title}
-**Company:** ${job.company}
-**Location:** ${job.location || 'Not specified'}
+Title: ${job.title}
+Company: ${job.company}
+Location: ${job.location || 'Not specified'}
 
-**Description:**
+Description:
 ${job.description || 'No description available.'}
 
 ---
 
-Score this job 1–10 based on how well it matches the candidate. Use the resume and context to make your own judgment — consider tech stack fit, seniority, role type, company fit, and anything in the candidate's stated preferences or dealbreakers.
+Score this job 1-10 based on how well it matches the candidate. Consider tech stack fit, seniority, role type, company fit, and the candidate's stated preferences or dealbreakers.
 
-Respond in EXACTLY this format (no other text):
-SCORE: <integer 1-10>
-REASONING: <2-4 sentences explaining the score>`;
+Respond with ONLY valid JSON in this exact format:
+{"score": <integer 1-10>, "reasoning": "<2-4 sentences explaining the score>"}`;
 
-  const text = await callGemini(prompt);
-  return parseScoreResponse(text);
+  try {
+    const json = await callGroqJson(prompt, { model: GROQ_SCORE_MODEL, maxTokens: 400 });
+    const score = typeof json.score === 'number'
+      ? Math.min(10, Math.max(1, Math.round(json.score)))
+      : null;
+    const reasoning = typeof json.reasoning === 'string' ? json.reasoning.trim() : '';
+    if (score == null) throw new Error('score field missing from JSON response');
+    return { score, reasoning };
+  } catch (jsonErr) {
+    // Fall back to plain-text format
+    const text = await callGroq(prompt.replace(
+      'Respond with ONLY valid JSON in this exact format:\n{"score": <integer 1-10>, "reasoning": "<2-4 sentences explaining the score>"}',
+      'Respond in EXACTLY this format (no other text):\nSCORE: <integer 1-10>\nREASONING: <2-4 sentences explaining the score>'
+    ), { model: GROQ_SCORE_MODEL, maxTokens: 400 });
+    return parseScoreResponse(text);
+  }
 }
 
 function parseScoreResponse(text) {
@@ -85,7 +133,9 @@ function parseScoreResponse(text) {
   const reasoningMatch = text.match(/^REASONING:\s*(.+)/ms);
 
   const score = scoreMatch ? Math.min(10, Math.max(1, parseInt(scoreMatch[1], 10))) : null;
-  const reasoning = reasoningMatch ? reasoningMatch[1].trim() : (scoreMatch ? text : `Score parse failed. Raw: ${text.slice(0, 200)}`);
+  const reasoning = reasoningMatch
+    ? reasoningMatch[1].trim()
+    : (scoreMatch ? text : `Score parse failed. Raw: ${text.slice(0, 200)}`);
 
   return { score, reasoning };
 }
@@ -118,7 +168,7 @@ Identify the top 2-4 most likely reasons a recruiter or hiring manager would pas
 
 Respond in 2-4 plain sentences. No bullet points, no headers.`;
 
-  return await callGemini(prompt, 2, 400);
+  return await callGroq(prompt, { model: GROQ_SCORE_MODEL, maxTokens: 400 });
 }
 
 // ---------------------------------------------------------------------------
@@ -149,6 +199,12 @@ if (require.main === module) {
     const results = [];
     for (const job of jobs) {
       try {
+        const filter = await scoreJobCoarseFilter(job);
+        if (!filter.pass) {
+          results.push({ ...job, score: 1, reasoning: 'Filtered: irrelevant role' });
+          log.info('Filtered (coarse)', { company: job.company, title: job.title });
+          continue;
+        }
         const { score, reasoning } = await scoreJob(job);
         results.push({ ...job, score, reasoning });
         log.info('Scored', { company: job.company, title: job.title, score });
@@ -162,4 +218,4 @@ if (require.main === module) {
   });
 }
 
-module.exports = { scoreJob, scoreRejectionLikelihood, parseScoreResponse, callGemini };
+module.exports = { scoreJob, scoreJobCoarseFilter, scoreRejectionLikelihood, parseScoreResponse };

@@ -1,0 +1,12 @@
+{
+  "search_term": "software engineer",
+  "location": "San Francisco, CA",
+  "site_name": ["indeed", "linkedin", "zip_recruiter"],
+  "results_wanted": 20,
+  "hours_old": 72,
+  "country_indeed": "USA",
+  "is_remote": false,
+  "job_type": "fulltime",
+  "linkedin_fetch_description": false,
+  "request_delay_ms": 3000
+}

@@ -31,8 +31,10 @@ const { scrapeAshby }      = require('./scrapers/ashby');
 const { scrapeWorkday }    = require('./scrapers/workday');
 const { scrapeBuiltin }    = require('./scrapers/builtin');
 const { scrapeRippling }   = require('./scrapers/rippling');
+const { scrapeJobSpy }     = require('./scrapers/jobspy');
 
 const { MAX_AGE_DAYS }      = require('./config/companies');
+const { isPrimaryPlatform } = require('./lib/ats-resolver');
 
 const MS_PER_DAY = 86_400_000;
 
@@ -70,7 +72,7 @@ function timed(label, fn) {
 async function scrapeAll() {
   log.info('Starting scrape across all platforms');
 
-  const [greenhouse, lever, workable, wellfound, remoteok, jobicy, arbeitnow, wwr, ashby, workday, builtin, rippling] = await Promise.allSettled([
+  const [greenhouse, lever, workable, wellfound, remoteok, jobicy, arbeitnow, wwr, ashby, workday, builtin, rippling, jobspy] = await Promise.allSettled([
     timed('greenhouse', scrapeGreenhouse),
     timed('lever', scrapeLever),
     timed('workable', scrapeWorkable),
@@ -83,13 +85,14 @@ async function scrapeAll() {
     timed('workday', scrapeWorkday),
     timed('builtin', scrapeBuiltin),
     timed('rippling', scrapeRippling),
+    timed('jobspy', () => Promise.resolve(scrapeJobSpy())),
   ]);
 
   const results = [
     ['greenhouse', greenhouse], ['lever', lever], ['workable', workable],
     ['wellfound', wellfound], ['remoteok', remoteok], ['jobicy', jobicy],
     ['arbeitnow', arbeitnow], ['wwr', wwr], ['ashby', ashby], ['workday', workday],
-    ['builtin', builtin], ['rippling', rippling],
+    ['builtin', builtin], ['rippling', rippling], ['jobspy', jobspy],
   ];
 
   const allJobs = results.flatMap(([label, r]) =>
@@ -98,11 +101,26 @@ async function scrapeAll() {
 
   // Deduplicate by derived internal id within this batch (DB-level dedup happens in pipeline.js)
   const seen = new Set();
-  const unique = allJobs.filter((j) => {
+  const uniqueById = allJobs.filter((j) => {
     if (!j.direct_apply_url) return false;
     const key = deriveJobId(j);
     if (seen.has(key)) return false;
     seen.add(key);
+    return true;
+  });
+
+  // Cross-source dedup by title+company: prefer primary-ATS sources over aggregators.
+  // Sort so primary ATS (greenhouse/lever/ashby/workday) come first, then dedup by title+company.
+  uniqueById.sort((a, b) => {
+    const aPrimary = isPrimaryPlatform(a.ats_platform_name) ? 0 : 1;
+    const bPrimary = isPrimaryPlatform(b.ats_platform_name) ? 0 : 1;
+    return aPrimary - bPrimary;
+  });
+  const seenTitleCompany = new Set();
+  const unique = uniqueById.filter((j) => {
+    const tcKey = `${(j.title || '').toLowerCase().trim()}|||${(j.company || '').toLowerCase().trim()}`;
+    if (seenTitleCompany.has(tcKey)) return false;
+    seenTitleCompany.add(tcKey);
     return true;
   });
 

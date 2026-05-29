@@ -45,6 +45,15 @@ const DAILY_TARGET = 5;
 // Auto-ghost: applied jobs with no response after this many days get marked ghosted
 const GHOSTED_AFTER_DAYS = 14;
 
+// Groq API rate limiting and retry config
+const GROQ_RATE_DELAY_MS = parsePositiveInteger(process.env.GROQ_RATE_DELAY_MS, 500);
+const GROQ_RETRY_BASE_DELAY_MS = 2000;
+const GROQ_429_DELAY_MS = 15000;
+const GROQ_MAX_RETRIES = 3;
+const GROQ_MAX_OUTPUT_TOKENS = 800;
+// Groq free tier: ~14,400 RPD on most models
+const GROQ_DAILY_LIMIT = 14400;
+
 module.exports = {
   GEMINI_RATE_DELAY_MS,
   GEMINI_RETRY_BASE_DELAY_MS,
@@ -66,4 +75,10 @@ module.exports = {
   GEMINI_DAILY_LIMIT,
   DAILY_TARGET,
   GHOSTED_AFTER_DAYS,
+  GROQ_RATE_DELAY_MS,
+  GROQ_RETRY_BASE_DELAY_MS,
+  GROQ_429_DELAY_MS,
+  GROQ_MAX_RETRIES,
+  GROQ_MAX_OUTPUT_TOKENS,
+  GROQ_DAILY_LIMIT,
 };

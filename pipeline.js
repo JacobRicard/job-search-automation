@@ -20,9 +20,9 @@ const {
   markJobScoreFailure,
   updateJobScore,
 } = require('./lib/db');
-const { scoreJob } = require('./scorer');
-const { callGemini, MODEL } = require('./lib/gemini');
-const { GEMINI_DAILY_LIMIT } = require('./config/constants');
+const { scoreJob, scoreJobCoarseFilter } = require('./scorer');
+const { callGroq, GROQ_SCORE_MODEL: MODEL } = require('./lib/groq');
+const { GROQ_DAILY_LIMIT } = require('./config/constants');
 const { classifyComplexity } = require('./lib/complexity');
 const { isPrimaryPlatform } = require('./lib/ats-resolver');
 const { jobLeadToInternal, validateWithPydantic } = require('./lib/job-lead');
@@ -88,7 +88,7 @@ New listings today: ${count} ${noun}
 Top matches by score: ${jobsList}
 Strong fits (8+/10): ${highScored.length > 0 ? highScored.map(j => `${j.company} (${j.score}/10)`).join(', ') : 'none today'}`;
 
-    const result = await callGemini(prompt);
+    const result = await callGroq(prompt, { model: MODEL });
     return result || `${count} new ${noun} scraped today.`;
   } catch (e) {
     log.error('Summary generation failed', { error: e.message });
@@ -97,7 +97,7 @@ Strong fits (8+/10): ${highScored.length > 0 ? highScored.map(j => `${j.company}
 }
 
 async function run() {
-  requireEnv('GEMINI_API_KEY');
+  requireEnv('GROQ_API_KEY');
   const scrapedLeads = validateWithPydantic(JSON.parse(fs.readFileSync(jobsJsonPath, 'utf8')));
   const scrapedRaw = scrapedLeads.map(jobLeadToInternal);
 
@@ -226,7 +226,7 @@ async function run() {
   const usedToday = db.prepare(
     "SELECT COALESCE(SUM(call_count), 0) as n FROM api_usage WHERE date = ? AND model = ?"
   ).get(todayStr, MODEL).n;
-  const remainingQuota = Math.max(0, GEMINI_DAILY_LIMIT - usedToday - 10); // reserve 10 for summary + retries
+  const remainingQuota = Math.max(0, GROQ_DAILY_LIMIT - usedToday - 10); // reserve 10 for summary + retries
   const scoringCandidates = getUnscoredJobs(db, { limit: remainingQuota });
   const firstRun = db.prepare("SELECT COUNT(*) AS n FROM jobs WHERE score IS NOT NULL").get().n < 10;
   const scoringPlan = getScoringPlan(scoringCandidates, process.env, { firstRun });
@@ -261,7 +261,7 @@ async function run() {
     log.info('Scoring started', { total: scoreTotal });
   }
 
-  const QUOTA_RE = /exceeded your current quota|RESOURCE_EXHAUSTED|quota.*exceeded|billing.*quota/i;
+  const QUOTA_RE = /exceeded your current quota|RESOURCE_EXHAUSTED|quota.*exceeded|billing.*quota|rate_limit_exceeded|rate limit/i;
   let quotaExhausted = false;
   let processed = 0;
 
@@ -272,10 +272,22 @@ async function run() {
     markJobScoreAttempt(db, job.id);
 
     try {
+      // Step 1: coarse relevance filter (fast, cheap model)
+      const filter = await scoreJobCoarseFilter(job);
+      if (!filter.pass) {
+        const filterReasoning = 'Filtered: irrelevant role';
+        updateJobScore(db, job.id, 1, filterReasoning);
+        autoArchive.run(job.id, archiveThreshold);
+        scoredOk++;
+        log.info('Coarse filter: archived', { title: job.title, company: job.company });
+        return;
+      }
+
+      // Step 2: full scoring
       const { score, reasoning } = await scoreJob(job);
 
       if (score == null) {
-        const error = reasoning || 'Gemini returned an unparsable score.';
+        const error = reasoning || 'Groq returned an unparsable score.';
         markJobScoreFailure(db, job.id, error);
         scoredFailed++;
         log.error('Scoring failed', { title: job.title, error });
@@ -310,12 +322,12 @@ async function run() {
 
   if (quotaExhausted) {
     const remaining = scoreTotal - processed;
-    log.warn('Gemini daily quota exhausted; stopping scoring loop early', {
+    log.warn('Groq daily quota exhausted; stopping scoring loop early', {
       scoredOk,
       scoredFailed,
       processed,
       remaining,
-      hint: 'Remaining jobs will be picked up by the next pipeline run after the quota resets (~24h).',
+      hint: 'Remaining jobs will be picked up by the next pipeline run.',
     });
   }
 

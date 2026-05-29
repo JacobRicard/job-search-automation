@@ -22,6 +22,7 @@ function parseArgs(argv) {
     skipMarketResearch: flags.has('--skip-market-research'),
     skipRejectionSync: flags.has('--skip-rejection-sync'),
     skipSlugCheck: flags.has('--skip-slug-check'),
+    skipDigest: flags.has('--skip-digest'),
     help: flags.has('--help') || flags.has('-h'),
   };
 }
@@ -174,6 +175,7 @@ Flags:
   --skip-market-research Skip market research refresh
   --skip-rejection-sync  Skip Gmail rejection email sync
   --skip-slug-check      Skip ATS slug validation
+  --skip-digest          Skip email digest
 `);
 }
 
@@ -229,6 +231,10 @@ async function main() {
   }
 
   runStep(repoRoot, 'Updating context files', ['scripts/update-context.js']);
+
+  if (!args.skipDigest) {
+    runStep(repoRoot, 'Sending email digest', ['scripts/send-email-digest.js'], { optional: true });
+  }
 
   // Best-effort log retention sweep at end of every run.
   spawnSync(process.execPath, ['scripts/prune-logs.js'], {
