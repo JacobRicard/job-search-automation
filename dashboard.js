@@ -41,6 +41,14 @@ const {
   handleScoringProgress,
 } = require('./lib/dashboard-routes');
 const { createSetupHandlers } = require('./lib/setup-routes');
+const {
+  handleGetSettings,
+  handleSaveEnv,
+  handleSaveCompanies,
+  handleSaveJobspy,
+  handleSaveContext,
+} = require('./lib/settings-routes');
+const { renderSettingsPage } = require('./lib/html/settings-page');
 
 const PORT = DASHBOARD_PORT;
 const db = getDb();
@@ -110,6 +118,12 @@ const routes = {
   'POST /api/setup/extract-profile': handleExtractProfile,
   'POST /api/setup/run-refresh': handleSetupRunRefresh,
   'GET /help':               handleHelpPage,
+  'GET /settings':           (req, res) => { res.writeHead(200, { 'Content-Type': 'text/html' }); res.end(renderSettingsPage()); },
+  'GET /api/settings':       handleGetSettings,
+  'POST /api/settings/env':  handleSaveEnv,
+  'POST /api/settings/companies': handleSaveCompanies,
+  'POST /api/settings/jobspy':    handleSaveJobspy,
+  'POST /api/settings/context':   handleSaveContext,
   'GET /':                   handleDashboardPage,
 };
 
