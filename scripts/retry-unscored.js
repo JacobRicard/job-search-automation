@@ -24,7 +24,7 @@ function parseLimit(argv) {
 }
 
 async function run() {
-  requireEnv('GEMINI_API_KEY');
+  requireEnv('GROQ_API_KEY');
 
   const limit = parseLimit(process.argv.slice(2));
   const db = getDb();
