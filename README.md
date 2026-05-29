@@ -109,7 +109,6 @@ Only needed for company discovery (`npm run discover`) and market research. Not 
 |----------|---------|---------|
 | `JOBSPY_ENABLED` | `false` | Set `true` to enable JobSpy scraping |
 | `JOBSPY_CONFIG_PATH` | `DATA_DIR/jobspy-config.json` | Path to config file |
-| `JOBSPY_LOCATIONS` | | Comma-separated locations; overrides config `location`, runs one call per term×location |
 
 ### Pipeline
 
@@ -121,7 +120,7 @@ Only needed for company discovery (`npm run discover`) and market research. Not 
 | `DASHBOARD_HOST` | `localhost` | Dashboard bind host |
 | `TZ` | `UTC` | Timezone for logs and dates |
 | `AUTO_ARCHIVE_THRESHOLD` | `4` | Auto-archive jobs scoring at or below this |
-| `LOCATION_FILTER` | | Comma-separated cities to allow (empty = all) |
+| `LOCATION_FILTER` | | Comma-separated cities to allow (empty = all). Also drives JobSpy per-location scraping. |
 | `LOCATION_BLOCKLIST` | | Comma-separated cities to block |
 | `BUILTIN_SUBDOMAIN` | `www` | Built In region (`seattle`, `nyc`, etc.) |
 | `LOG_LEVEL` | `info` | `debug` / `info` / `warn` / `error` |
@@ -209,15 +208,15 @@ JobSpy scrapes Indeed, LinkedIn, Glassdoor, and ZipRecruiter directly.
    JOBSPY_ENABLED=true
    ```
 
-### Multiple locations via env var
+### Multiple locations
 
-To scrape the same search terms across multiple cities, set `JOBSPY_LOCATIONS` in `.env` as a comma-separated list. This overrides the `"location"` field in the config and runs one `scrape_jobs()` call per `search_term` × `location` combination:
+JobSpy reuses the existing `LOCATION_FILTER` pipeline variable for multi-location scraping. If `LOCATION_FILTER` is set, JobSpy runs one `scrape_jobs()` call per `search_term` × `location` combination:
 
 ```
-JOBSPY_LOCATIONS=San Francisco CA,Seattle WA,Austin TX
+LOCATION_FILTER=San Francisco CA,Seattle WA,Austin TX
 ```
 
-Results from all combinations are merged and deduplicated by URL before output. If `JOBSPY_LOCATIONS` is not set, the `"location"` field in the config file is used.
+Results from all combinations are merged and deduplicated by URL before output. If `LOCATION_FILTER` is not set, the `"location"` field in `jobspy-config.json` is used as a single location. If neither is set, JobSpy scrapes without a location filter.
 
 > **LinkedIn rate limiting.** LinkedIn aggressively rate-limits scrapers. If you see empty results or errors, increase `request_delay_ms` to `5000`+, set `linkedin_fetch_description` to `false`, and reduce `results_wanted`. If problems persist, remove `linkedin` from `site_name`. With multiple search terms and locations, each combination adds an extra scrape call — keep the total combination count low for LinkedIn.
 

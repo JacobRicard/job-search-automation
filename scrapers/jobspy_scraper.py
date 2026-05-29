@@ -106,10 +106,11 @@ def get_search_terms(config: dict) -> list[str]:
 def get_locations(config: dict) -> list[str | None]:
     """
     Return a list of locations to scrape.
-    JOBSPY_LOCATIONS env var (comma-separated) takes precedence over config "location".
+    LOCATION_FILTER env var (comma-separated, same var used by the pipeline allowlist)
+    takes precedence over the config "location" field.
     Returns [None] if no location is specified (scrape without location filter).
     """
-    env_locations = os.environ.get("JOBSPY_LOCATIONS", "").strip()
+    env_locations = os.environ.get("LOCATION_FILTER", "").strip()
     if env_locations:
         return [loc.strip() for loc in env_locations.split(",") if loc.strip()]
     config_location = config.get("location")
