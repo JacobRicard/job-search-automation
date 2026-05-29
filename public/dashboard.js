@@ -367,7 +367,7 @@ function wizardUpdateResumeHint() {
   var status = document.getElementById('wizard-resume-status');
   if (!status) return;
   if (!_wizardHasKey) {
-    status.textContent = 'Enter your Gemini API key in step 1 to upload PDFs, or upload a .txt file.';
+    status.textContent = 'PDF extraction requires a Gemini API key set in .env (GEMINI_API_KEY). Paste your resume as text or upload a .txt file instead.';
     status.style.color = 'var(--text-muted)';
   } else {
     status.textContent = '';
@@ -492,7 +492,7 @@ function wizardSaveResume() {
           .then(function(r) { return r.json(); })
           .then(function(data) {
             if (!data.ok && data.error === 'no_key') {
-              if (status) { status.textContent = 'Enter your Gemini API key in step 1 to upload PDFs, or upload a .txt file.'; status.style.color = 'var(--red)'; }
+              if (status) { status.textContent = 'PDF extraction requires a Gemini API key set in .env (GEMINI_API_KEY). Paste your resume as text or upload a .txt file instead.'; status.style.color = 'var(--red)'; }
               if (saveBtn) saveBtn.disabled = false;
               return;
             }
@@ -644,7 +644,7 @@ function wizardDone() {
     if (parseInt(usedEl.textContent, 10) === used) return;
     usedEl.textContent = used;
     var wrap = document.getElementById('api-indicator');
-    var limit = parseInt((wrap && wrap.dataset.limit) || '500', 10);
+    var limit = parseInt((wrap && wrap.dataset.limit) || '14400', 10);
     if (wrap && limit > 0) {
       wrap.style.color = used > limit * 0.8 ? '#ef4444' : '';
     }
@@ -669,7 +669,7 @@ function wizardDone() {
         var pct = d.total > 0 ? Math.round((d.scored / d.total) * 100) : 0;
         var stateLabel;
         if (d.quotaExhausted) {
-          stateLabel = 'Daily Gemini quota reached. Scored ' + d.scored + ' of ' + d.total + ' jobs so far — remaining ' + d.unscored + ' will be picked up automatically once the quota resets (~24h).';
+          stateLabel = 'Daily Groq quota reached. Scored ' + d.scored + ' of ' + d.total + ' jobs so far — remaining ' + d.unscored + ' will be picked up on the next pipeline run.';
         } else if (d.total === 0) {
           stateLabel = 'Setting up your first job search — discovering companies and scraping job boards in the background. First jobs usually appear within 2–3 minutes.';
         } else if (d.scored === 0 && !d.active) {

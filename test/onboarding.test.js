@@ -240,7 +240,8 @@ describe('setup HTTP handlers', () => {
   let port;
   let tmpDir;
   let envPath;
-  const savedKey = process.env.GEMINI_API_KEY;
+  const savedGroqKey = process.env.GROQ_API_KEY;
+  const savedGeminiKey = process.env.GEMINI_API_KEY;
 
   before(async () => {
     tmpDir = makeTmpDir();
@@ -255,12 +256,14 @@ describe('setup HTTP handlers', () => {
       server.close((err) => err ? reject(err) : resolve());
     });
     rmDir(tmpDir);
-    if (savedKey === undefined) delete process.env.GEMINI_API_KEY;
-    else process.env.GEMINI_API_KEY = savedKey;
+    if (savedGroqKey === undefined) delete process.env.GROQ_API_KEY;
+    else process.env.GROQ_API_KEY = savedGroqKey;
+    if (savedGeminiKey === undefined) delete process.env.GEMINI_API_KEY;
+    else process.env.GEMINI_API_KEY = savedGeminiKey;
   });
 
   it('GET /api/setup/status returns empty strings and hasKey false when no files exist', async () => {
-    delete process.env.GEMINI_API_KEY;
+    delete process.env.GROQ_API_KEY;
     const { status, body } = await get(port, '/api/setup/status');
     assert.equal(status, 200);
     assert.equal(body.resumeContent, '');
@@ -276,11 +279,11 @@ describe('setup HTTP handlers', () => {
     fs.rmSync(path.join(tmpDir, 'resume.md'));
   });
 
-  it('GET /api/setup/status returns hasKey true when GEMINI_API_KEY is set', async () => {
-    process.env.GEMINI_API_KEY = 'test-key';
+  it('GET /api/setup/status returns hasKey true when GROQ_API_KEY is set', async () => {
+    process.env.GROQ_API_KEY = 'gsk_test-key';
     const { body } = await get(port, '/api/setup/status');
     assert.equal(body.hasKey, true);
-    delete process.env.GEMINI_API_KEY;
+    delete process.env.GROQ_API_KEY;
   });
 
   it('POST /api/setup/resume writes resume.md and returns ok', async () => {
@@ -326,12 +329,12 @@ describe('setup HTTP handlers', () => {
     delete require.cache[require.resolve(companiesPath)];
   });
 
-  it('POST /api/setup/api-key writes GEMINI_API_KEY to .env', async () => {
-    const { status, body } = await post(port, '/api/setup/api-key', { key: 'AIzaTestKey123' });
+  it('POST /api/setup/api-key writes GROQ_API_KEY to .env', async () => {
+    const { status, body } = await post(port, '/api/setup/api-key', { key: 'gsk_TestKey123' });
     assert.equal(status, 200);
     assert.equal(body.ok, true);
     const content = fs.readFileSync(envPath, 'utf8');
-    assert.ok(content.includes('GEMINI_API_KEY=AIzaTestKey123'));
+    assert.ok(content.includes('GROQ_API_KEY=gsk_TestKey123'));
   });
 
   it('POST /api/setup/api-key with empty key does not touch .env', async () => {
@@ -352,58 +355,59 @@ describe('setup HTTP handlers', () => {
 
   // --- regression: wizard PDF upload showed "no_key" even after key was saved ---
 
-  it('POST /api/setup/resume with pdf format returns no_key when GEMINI_API_KEY is not set', async () => {
+  it('POST /api/setup/resume with pdf format returns no_gemini_key when GEMINI_API_KEY is not set', async () => {
     delete process.env.GEMINI_API_KEY;
     const { status, body } = await post(port, '/api/setup/resume', { content: 'dGVzdA==', format: 'pdf' });
     assert.equal(status, 400);
     assert.equal(body.ok, false);
-    assert.equal(body.error, 'no_key');
+    assert.equal(body.error, 'no_gemini_key');
   });
 
-  it('POST /api/setup/api-key sets process.env.GEMINI_API_KEY immediately for subsequent requests', async () => {
-    delete process.env.GEMINI_API_KEY;
-    const { status, body } = await post(port, '/api/setup/api-key', { key: 'AIzaSyRuntimeTestKey' });
+  it('POST /api/setup/api-key sets process.env.GROQ_API_KEY immediately for subsequent requests', async () => {
+    delete process.env.GROQ_API_KEY;
+    const { status, body } = await post(port, '/api/setup/api-key', { key: 'gsk_RuntimeTestKey' });
     assert.equal(status, 200);
     assert.equal(body.ok, true);
-    assert.equal(process.env.GEMINI_API_KEY, 'AIzaSyRuntimeTestKey');
-    delete process.env.GEMINI_API_KEY;
+    assert.equal(process.env.GROQ_API_KEY, 'gsk_RuntimeTestKey');
+    delete process.env.GROQ_API_KEY;
   });
 
   it('GET /api/setup/status returns hasKey true immediately after saving key via api-key endpoint', async () => {
-    delete process.env.GEMINI_API_KEY;
-    await post(port, '/api/setup/api-key', { key: 'AIzaSySequenceKey' });
+    delete process.env.GROQ_API_KEY;
+    await post(port, '/api/setup/api-key', { key: 'gsk_SequenceKey' });
     const { body } = await get(port, '/api/setup/status');
     assert.equal(body.hasKey, true);
-    delete process.env.GEMINI_API_KEY;
+    delete process.env.GROQ_API_KEY;
   });
 
-  it('POST /api/setup/resume with pdf format does not return no_key after key is saved', async () => {
+  it('POST /api/setup/resume with pdf format returns no_gemini_key when only GROQ key is saved', async () => {
     delete process.env.GEMINI_API_KEY;
-    await post(port, '/api/setup/api-key', { key: 'AIzaSyAfterSaveKey' });
-    // Key is now set — PDF upload should fail for a real reason (invalid key/content),
-    // but NOT with no_key (the gate that was incorrectly blocking the wizard)
+    delete process.env.GROQ_API_KEY;
+    await post(port, '/api/setup/api-key', { key: 'gsk_AfterSaveKey' });
+    // Saving the Groq key does not satisfy the Gemini PDF check —
+    // error should be no_gemini_key (not no_key, the old gate name)
     const { body } = await post(port, '/api/setup/resume', { content: 'dGVzdA==', format: 'pdf' });
-    assert.notEqual(body.error, 'no_key');
-    delete process.env.GEMINI_API_KEY;
+    assert.equal(body.error, 'no_gemini_key');
+    delete process.env.GROQ_API_KEY;
   });
 
   it('POST /api/setup/api-key trims whitespace before saving', async () => {
-    delete process.env.GEMINI_API_KEY;
-    await post(port, '/api/setup/api-key', { key: '  AIzaSyTrimTest  ' });
-    assert.equal(process.env.GEMINI_API_KEY, 'AIzaSyTrimTest');
+    delete process.env.GROQ_API_KEY;
+    await post(port, '/api/setup/api-key', { key: '  gsk_TrimTest  ' });
+    assert.equal(process.env.GROQ_API_KEY, 'gsk_TrimTest');
     const content = fs.readFileSync(envPath, 'utf8');
-    assert.ok(content.includes('GEMINI_API_KEY=AIzaSyTrimTest'));
-    assert.ok(!content.includes(' AIzaSyTrimTest'));
-    delete process.env.GEMINI_API_KEY;
+    assert.ok(content.includes('GROQ_API_KEY=gsk_TrimTest'));
+    assert.ok(!content.includes(' gsk_TrimTest'));
+    delete process.env.GROQ_API_KEY;
   });
 
   it('POST /api/setup/api-key with whitespace-only key does not save', async () => {
-    delete process.env.GEMINI_API_KEY;
+    delete process.env.GROQ_API_KEY;
     fs.writeFileSync(envPath, 'EXISTING=keep\n', 'utf8');
     await post(port, '/api/setup/api-key', { key: '   ' });
-    assert.equal(process.env.GEMINI_API_KEY, undefined);
+    assert.equal(process.env.GROQ_API_KEY, undefined);
     const content = fs.readFileSync(envPath, 'utf8');
-    assert.ok(!content.includes('GEMINI_API_KEY'));
+    assert.ok(!content.includes('GROQ_API_KEY'));
     assert.ok(content.includes('EXISTING=keep'));
   });
 });
