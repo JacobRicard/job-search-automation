@@ -31,7 +31,7 @@ const { getHistoricalStageStats } = require('./lib/stage-stats');
 const { mapConcurrent } = require('./lib/concurrency');
 
 // Score multiple jobs in flight at once. Throughput is still bounded by the
-// Gemini slot reservation (GEMINI_RATE_DELAY_MS); concurrency only overlaps
+// Groq slot reservation (GROQ_RATE_DELAY_MS); concurrency only overlaps
 // network latency so it doesn't add on top of the pacing.
 const SCORING_CONCURRENCY = parseInt(process.env.SCORING_CONCURRENCY, 10) || 3;
 const logPaths = require('./lib/log-paths');
@@ -239,7 +239,7 @@ async function run() {
     });
   }
   const toScore = scoringPlan.jobs;
-  if (usedToday > 0 || remainingQuota < GEMINI_DAILY_LIMIT) {
+  if (usedToday > 0 || remainingQuota < GROQ_DAILY_LIMIT) {
     log.info('Daily quota check', {
       usedToday,
       remainingQuota,
