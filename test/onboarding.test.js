@@ -82,13 +82,12 @@ function startServer(handlers) {
 
 describe('buildContextMd', () => {
   it('generates correct markdown with all fields', () => {
-    const md = buildContextMd({ titles: 'Staff Engineer', stack: 'Go\nPostgres', salary: '200000', location: 'Remote' });
+    const md = buildContextMd({ titles: 'Staff Engineer', salary: '200000', location: 'Remote' });
     assert.ok(md.includes('## What I\'m looking for'));
     assert.ok(md.includes('Remote'));
     assert.ok(md.includes('- Staff Engineer'));
-    assert.ok(md.includes('- Go'));
-    assert.ok(md.includes('- Postgres'));
     assert.ok(md.includes('- Base floor: $200000'));
+    assert.ok(!md.includes('## Stack I\'m most productive in'));
   });
 
   it('uses (not specified) when titles is empty', () => {
@@ -96,9 +95,9 @@ describe('buildContextMd', () => {
     assert.ok(md.includes('## Target titles\n\n- (not specified)'));
   });
 
-  it('uses (not specified) when stack is empty', () => {
-    const md = buildContextMd({ titles: 'Engineer', stack: '', salary: '150000', location: 'Remote' });
-    assert.ok(md.includes('## Stack I\'m most productive in\n\n- (not specified)'));
+  it('does not include a stack section', () => {
+    const md = buildContextMd({ titles: 'Engineer', salary: '150000', location: 'Remote' });
+    assert.ok(!md.includes('## Stack I\'m most productive in'));
   });
 
   it('uses (not specified) for compensation when salary is empty', () => {
