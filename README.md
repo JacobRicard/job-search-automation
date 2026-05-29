@@ -109,6 +109,7 @@ Only needed for company discovery (`npm run discover`) and market research. Not 
 |----------|---------|---------|
 | `JOBSPY_ENABLED` | `false` | Set `true` to enable JobSpy scraping |
 | `JOBSPY_CONFIG_PATH` | `DATA_DIR/jobspy-config.json` | Path to config file |
+| `JOBSPY_LOCATIONS` | | Comma-separated locations; overrides config `location`, runs one call per term×location |
 
 ### Pipeline
 
@@ -181,9 +182,9 @@ JobSpy scrapes Indeed, LinkedIn, Glassdoor, and ZipRecruiter directly.
 3. Edit `data/jobspy-config.json`:
    ```json
    {
-     "search_term": "software engineer",
+     "search_term": ["software engineer", "site reliability engineer"],
      "location": "San Francisco, CA",
-     "site_name": ["indeed", "linkedin", "zip_recruiter"],
+     "site_name": ["indeed", "linkedin", "glassdoor", "zip_recruiter"],
      "results_wanted": 20,
      "hours_old": 72,
      "country_indeed": "USA",
@@ -196,10 +197,11 @@ JobSpy scrapes Indeed, LinkedIn, Glassdoor, and ZipRecruiter directly.
 
    | Field | Options | Notes |
    |-------|---------|-------|
-   | `site_name` | `indeed`, `linkedin`, `glassdoor`, `zip_recruiter` | List any subset |
+   | `search_term` | string or array of strings | Each term gets its own scrape pass |
+   | `site_name` | `indeed`, `linkedin`, `glassdoor`, `zip_recruiter` | Include any subset |
    | `job_type` | `fulltime`, `parttime`, `internship`, `contract` | Optional |
    | `is_remote` | `true` / `false` | Optional |
-   | `request_delay_ms` | integer | Delay after scraping (rate-limit courtesy pause) |
+   | `request_delay_ms` | integer | Sleep between scrape calls (rate-limit courtesy pause) |
    | `linkedin_fetch_description` | `true` / `false` | Fetches full descriptions; slower, may hit LinkedIn limits |
 
 4. Enable in `.env`:
@@ -207,7 +209,17 @@ JobSpy scrapes Indeed, LinkedIn, Glassdoor, and ZipRecruiter directly.
    JOBSPY_ENABLED=true
    ```
 
-> **LinkedIn rate limiting.** LinkedIn aggressively rate-limits scrapers. If you see empty results or errors, increase `request_delay_ms` to `5000`+, set `linkedin_fetch_description` to `false`, and reduce `results_wanted`. If problems persist, remove `linkedin` from `site_name`.
+### Multiple locations via env var
+
+To scrape the same search terms across multiple cities, set `JOBSPY_LOCATIONS` in `.env` as a comma-separated list. This overrides the `"location"` field in the config and runs one `scrape_jobs()` call per `search_term` × `location` combination:
+
+```
+JOBSPY_LOCATIONS=San Francisco CA,Seattle WA,Austin TX
+```
+
+Results from all combinations are merged and deduplicated by URL before output. If `JOBSPY_LOCATIONS` is not set, the `"location"` field in the config file is used.
+
+> **LinkedIn rate limiting.** LinkedIn aggressively rate-limits scrapers. If you see empty results or errors, increase `request_delay_ms` to `5000`+, set `linkedin_fetch_description` to `false`, and reduce `results_wanted`. If problems persist, remove `linkedin` from `site_name`. With multiple search terms and locations, each combination adds an extra scrape call — keep the total combination count low for LinkedIn.
 
 ---
 

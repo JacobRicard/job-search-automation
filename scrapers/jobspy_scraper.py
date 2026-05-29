@@ -1,7 +1,11 @@
 #!/usr/bin/env python3
 """
 JobSpy scraper — reads config from DATA_DIR/jobspy-config.json (or JOBSPY_CONFIG_PATH),
-calls jobspy.scrape_jobs(), and outputs a JSON array of JobLead-compatible dicts to stdout.
+calls jobspy.scrape_jobs() once per search_term x location combination, merges all results,
+deduplicates by job_url, and outputs a JSON array of JobLead-compatible dicts to stdout.
+
+search_term may be a string or a list of strings in the config file.
+JOBSPY_LOCATIONS env var (comma-separated) overrides the "location" config field.
 """
 
 from __future__ import annotations
@@ -12,19 +16,6 @@ import sys
 import time
 from datetime import datetime, timezone
 from urllib.parse import urlparse
-
-CONFIG_FIELDS = {
-    "search_term": str,
-    "location": str,
-    "site_name": list,
-    "results_wanted": int,
-    "hours_old": int,
-    "country_indeed": str,
-    "is_remote": bool,
-    "job_type": str,
-    "linkedin_fetch_description": bool,
-    "request_delay_ms": int,
-}
 
 DEFAULTS = {
     "results_wanted": 20,
@@ -102,6 +93,41 @@ def row_to_job_lead(row: dict, scraped_ts: str) -> dict | None:
     }
 
 
+def get_search_terms(config: dict) -> list[str]:
+    """Return a list of search terms from config. Accepts string or list of strings."""
+    raw = config.get("search_term")
+    if not raw:
+        return []
+    if isinstance(raw, list):
+        return [str(t).strip() for t in raw if t and str(t).strip()]
+    return [str(raw).strip()]
+
+
+def get_locations(config: dict) -> list[str | None]:
+    """
+    Return a list of locations to scrape.
+    JOBSPY_LOCATIONS env var (comma-separated) takes precedence over config "location".
+    Returns [None] if no location is specified (scrape without location filter).
+    """
+    env_locations = os.environ.get("JOBSPY_LOCATIONS", "").strip()
+    if env_locations:
+        return [loc.strip() for loc in env_locations.split(",") if loc.strip()]
+    config_location = config.get("location")
+    if config_location:
+        return [str(config_location).strip()]
+    return [None]
+
+
+def build_base_kwargs(config: dict) -> dict:
+    """Build scrape_jobs kwargs from config, excluding search_term and location."""
+    kwargs: dict = dict(DEFAULTS)
+    for field in ("site_name", "results_wanted", "hours_old", "country_indeed",
+                  "is_remote", "job_type", "linkedin_fetch_description"):
+        if field in config:
+            kwargs[field] = config[field]
+    return kwargs
+
+
 def main() -> int:
     try:
         from jobspy import scrape_jobs
@@ -116,41 +142,46 @@ def main() -> int:
         print("[]")
         return 0
 
-    # Build kwargs for scrape_jobs, filtering to known params
-    kwargs: dict = dict(DEFAULTS)
-    for field in ("search_term", "location", "site_name", "results_wanted",
-                  "hours_old", "country_indeed", "is_remote", "job_type",
-                  "linkedin_fetch_description"):
-        if field in config:
-            kwargs[field] = config[field]
-
-    # Remove fields that scrape_jobs doesn't accept
-    delay_ms = kwargs.pop("request_delay_ms", 3000)
-
-    if "search_term" not in kwargs or not kwargs["search_term"]:
+    search_terms = get_search_terms(config)
+    if not search_terms:
         print("Warning: jobspy-config.json missing 'search_term'", file=sys.stderr)
         print("[]")
         return 0
 
-    try:
-        df = scrape_jobs(**kwargs)
-    except Exception as exc:
-        print(f"Warning: JobSpy scrape failed: {exc}", file=sys.stderr)
-        print("[]")
-        return 0
+    locations = get_locations(config)
+    base_kwargs = build_base_kwargs(config)
+    delay_ms = int(config.get("request_delay_ms", DEFAULTS["request_delay_ms"]))
+
+    # Build the full list of (term, location) combinations to run
+    combinations = [(term, loc) for term in search_terms for loc in locations]
 
     scraped_ts = datetime.now(timezone.utc).isoformat()
-    leads = []
+    seen_urls: set[str] = set()
+    leads: list[dict] = []
 
-    if df is not None and len(df) > 0:
-        for _, row in df.iterrows():
-            lead = row_to_job_lead(row.to_dict(), scraped_ts)
-            if lead:
-                leads.append(lead)
+    for i, (term, loc) in enumerate(combinations):
+        kwargs = dict(base_kwargs)
+        kwargs["search_term"] = term
+        if loc is not None:
+            kwargs["location"] = loc
 
-    # Configurable delay after scraping (rate-limit courtesy pause)
-    if delay_ms > 0:
-        time.sleep(delay_ms / 1000)
+        loc_label = loc or "(no location)"
+        try:
+            df = scrape_jobs(**kwargs)
+        except Exception as exc:
+            print(f"Warning: JobSpy scrape failed for '{term}' / '{loc_label}': {exc}", file=sys.stderr)
+            df = None
+
+        if df is not None and len(df) > 0:
+            for _, row in df.iterrows():
+                lead = row_to_job_lead(row.to_dict(), scraped_ts)
+                if lead and lead["direct_apply_url"] not in seen_urls:
+                    seen_urls.add(lead["direct_apply_url"])
+                    leads.append(lead)
+
+        # Sleep between calls but not after the last one
+        if delay_ms > 0 and i < len(combinations) - 1:
+            time.sleep(delay_ms / 1000)
 
     json.dump(leads, sys.stdout, indent=2, default=str)
     sys.stdout.write("\n")
