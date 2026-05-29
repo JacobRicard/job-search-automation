@@ -365,13 +365,21 @@ function wizardGoTo(step) {
 
 function wizardUpdateResumeHint() {
   var status = document.getElementById('wizard-resume-status');
-  if (!status) return;
-  if (!_wizardHasKey) {
-    status.textContent = 'PDF extraction requires a Gemini API key set in .env (GEMINI_API_KEY). Paste your resume as text or upload a .txt file instead.';
-    status.style.color = 'var(--text-muted)';
-  } else {
-    status.textContent = '';
-  }
+  if (status) status.textContent = '';
+}
+
+// Load PDF.js on demand from CDN for client-side text extraction
+function loadPdfJs(callback) {
+  if (window.pdfjsLib) { callback(window.pdfjsLib); return; }
+  var s = document.createElement('script');
+  s.src = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js';
+  s.onload = function() {
+    window.pdfjsLib.GlobalWorkerOptions.workerSrc =
+      'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+    callback(window.pdfjsLib);
+  };
+  s.onerror = function() { callback(null); };
+  document.head.appendChild(s);
 }
 
 function wizardKickoffPipeline() {
@@ -473,57 +481,69 @@ function wizardSaveResume() {
   var isPdf = file.name.toLowerCase().endsWith('.pdf');
 
   if (isPdf) {
-    var reader = new FileReader();
-    reader.onload = function(e) {
-      try {
-        var bytes = new Uint8Array(e.target.result);
-        var binary = '';
-        var chunk = 0x8000;
-        for (var i = 0; i < bytes.length; i += chunk) {
-          binary += String.fromCharCode.apply(null, bytes.subarray(i, i + chunk));
-        }
-        var base64 = btoa(binary);
-        console.log('[wizard] uploading PDF resume, bytes=' + bytes.length + ' base64=' + base64.length);
-        fetch('/api/setup/resume', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ content: base64, format: 'pdf' }),
-        })
-          .then(function(r) { return r.json(); })
-          .then(function(data) {
-            if (!data.ok && data.error === 'no_key') {
-              if (status) { status.textContent = 'PDF extraction requires a Gemini API key set in .env (GEMINI_API_KEY). Paste your resume as text or upload a .txt file instead.'; status.style.color = 'var(--red)'; }
-              if (saveBtn) saveBtn.disabled = false;
-              return;
+    // Extract text from the PDF in the browser using PDF.js — no server-side key needed.
+    if (status) { status.textContent = 'Extracting text from PDF...'; status.style.color = 'var(--text-muted)'; }
+    loadPdfJs(function(pdfjs) {
+      if (!pdfjs) {
+        if (status) { status.textContent = 'Could not load PDF reader. Upload a .txt or .md file instead.'; status.style.color = 'var(--red)'; }
+        if (saveBtn) saveBtn.disabled = false;
+        return;
+      }
+      var reader = new FileReader();
+      reader.onload = function(e) {
+        pdfjs.getDocument({ data: new Uint8Array(e.target.result) }).promise
+          .then(function(pdf) {
+            var pagePromises = [];
+            for (var p = 1; p <= pdf.numPages; p++) {
+              pagePromises.push(
+                pdf.getPage(p).then(function(page) {
+                  return page.getTextContent().then(function(tc) {
+                    return tc.items.map(function(it) { return it.str; }).join(' ');
+                  });
+                })
+              );
             }
-            if (!data.ok) {
-              console.error('[wizard] resume upload rejected by server:', data.error);
-              var msg = data.error ? ('Upload failed: ' + data.error) : 'Upload failed. Try a .txt file instead.';
-              if (status) { status.textContent = msg; status.style.color = 'var(--red)'; }
-              if (saveBtn) saveBtn.disabled = false;
-              return;
-            }
-            if (saveBtn) saveBtn.disabled = false;
-            wizardNext();
-            wizardAutoFillTargets();
+            return Promise.all(pagePromises);
           })
-          .catch(function(err) {
-            console.error('[wizard] resume upload fetch failed:', err);
-            if (status) { status.textContent = 'Upload failed: ' + (err && err.message ? err.message : 'network error'); status.style.color = 'var(--red)'; }
+          .then(function(pages) {
+            var text = pages.join('\n\n').trim();
+            if (!text) {
+              if (status) { status.textContent = 'No text found in this PDF. Upload a .txt or .md file instead.'; status.style.color = 'var(--red)'; }
+              if (saveBtn) saveBtn.disabled = false;
+              return;
+            }
+            fetch('/api/setup/resume', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ content: text }),
+            })
+              .then(function(r) { return r.json(); })
+              .then(function(data) {
+                if (saveBtn) saveBtn.disabled = false;
+                if (!data.ok) {
+                  if (status) { status.textContent = 'Upload failed: ' + (data.error || 'unknown'); status.style.color = 'var(--red)'; }
+                  return;
+                }
+                wizardNext();
+                wizardAutoFillTargets();
+              })
+              .catch(function(err) {
+                if (status) { status.textContent = 'Upload failed: ' + (err && err.message ? err.message : 'network error'); status.style.color = 'var(--red)'; }
+                if (saveBtn) saveBtn.disabled = false;
+              });
+          })
+          .catch(function() {
+            if (status) { status.textContent = 'Could not read this PDF. Try a .txt or .md file.'; status.style.color = 'var(--red)'; }
             if (saveBtn) saveBtn.disabled = false;
           });
-      } catch (err) {
-        console.error('[wizard] resume read/encode failed:', err);
-        if (status) { status.textContent = 'Upload failed: ' + err.message; status.style.color = 'var(--red)'; }
+      };
+      reader.onerror = function() {
+        if (status) { status.textContent = 'Could not read file.'; status.style.color = 'var(--red)'; }
         if (saveBtn) saveBtn.disabled = false;
-      }
-    };
-    reader.onerror = function() {
-      console.error('[wizard] FileReader error:', reader.error);
-      if (status) { status.textContent = 'Could not read file: ' + (reader.error && reader.error.message ? reader.error.message : 'unknown'); status.style.color = 'var(--red)'; }
-      if (saveBtn) saveBtn.disabled = false;
-    };
-    reader.readAsArrayBuffer(file);
+      };
+      reader.readAsArrayBuffer(file);
+    });
+    return;
   } else {
     var reader = new FileReader();
     reader.onload = function(e) {
