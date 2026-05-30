@@ -6,6 +6,17 @@ const ICON_CHECK = `<svg xmlns="http://www.w3.org/2000/svg" width="13" height="1
 
 let _currentJobId = null;
 
+// ── Manual refresh trigger ────────────────────────────────────────────
+function triggerRefresh(btn) {
+  if (btn) { btn.disabled = true; btn.style.opacity = '0.4'; }
+  fetch('/api/setup/run-refresh', { method: 'POST' })
+    .then(function(r) { return r.json(); })
+    .then(function(d) {
+      if (btn) { btn.disabled = false; btn.style.opacity = ''; btn.title = d.ok ? 'Started! (runId ' + d.runId + ')' : 'Already running'; }
+    })
+    .catch(function() { if (btn) { btn.disabled = false; btn.style.opacity = ''; } });
+}
+
 // ── Header popovers (nav menu, filter panel) ─────────────────────────
 const PANEL_IDS = ['nav-menu', 'filter-panel'];
 
