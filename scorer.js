@@ -75,6 +75,12 @@ Description (first 500 chars): ${descSnippet}
 
 Respond ONLY with PASS or FAIL.`;
 
+  const blocklist = (process.env.TITLE_BLOCKLIST || '')
+    .split(',').map(s => s.trim()).filter(Boolean);
+  if (blocklist.length) {
+    prompt += `\n\nAlso respond FAIL if the job title contains any of these words or phrases: ${blocklist.join(', ')}.`;
+  }
+
   try {
     const text = await llm.callText(prompt, { model: llm.filterModel, maxTokens: 10 });
     const upper = text.toUpperCase().trim();

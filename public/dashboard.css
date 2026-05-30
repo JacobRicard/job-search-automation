@@ -954,12 +954,12 @@ header {
 }
 
 .job-card.expanded .reasoning-panel {
-  max-height: 300px;
+  max-height: 500px;
   border-top: 1px solid rgba(255, 255, 255, 0.07);
 }
 
 .reasoning-panel-inner {
-  padding: 10px 16px 12px 94px;
+  padding: 10px 16px 8px 94px;
   font-size: 0.78rem;
   line-height: 1.6;
   color: var(--text-muted);
@@ -975,6 +975,29 @@ header {
   font-size: 0.75rem;
   font-style: italic;
 }
+
+/* ── Description Snippet ─────────────────────────────────────────── */
+
+.desc-snippet {
+  grid-column: 1 / -1;
+  padding: 0 16px 10px 94px;
+  font-size: 0.75rem;
+  line-height: 1.55;
+  color: var(--text-faint);
+}
+
+.desc-more-btn {
+  background: none;
+  border: none;
+  color: var(--accent);
+  font-size: 0.72rem;
+  cursor: pointer;
+  padding: 0;
+  margin-left: 4px;
+  white-space: nowrap;
+  opacity: 0.8;
+}
+.desc-more-btn:hover { opacity: 1; }
 
 /* ── Right Column (Status + Command Bar) ─────────────────────────── */
 
