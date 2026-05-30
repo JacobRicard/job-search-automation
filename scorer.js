@@ -24,6 +24,16 @@ const createLogger = require('./lib/logger');
 const { baseDir } = require('./config/paths');
 const { callGroq, callGroqJson, GROQ_FILTER_MODEL, GROQ_SCORE_MODEL } = require('./lib/groq');
 
+// Returns the right LLM call functions based on env config.
+// Prefers Ollama when OLLAMA_HOST is set; falls back to Groq.
+function getLLM() {
+  if (process.env.OLLAMA_HOST) {
+    const { callOllama, callOllamaJson, OLLAMA_FILTER_MODEL, OLLAMA_SCORE_MODEL } = require('./lib/ollama');
+    return { callText: callOllama, callJson: callOllamaJson, filterModel: OLLAMA_FILTER_MODEL, scoreModel: OLLAMA_SCORE_MODEL, hasKey: true };
+  }
+  return { callText: callGroq, callJson: callGroqJson, filterModel: GROQ_FILTER_MODEL, scoreModel: GROQ_SCORE_MODEL, hasKey: !!process.env.GROQ_API_KEY };
+}
+
 function readFile(filename) {
   const filePath = path.join(baseDir, filename);
   try {
@@ -44,7 +54,8 @@ let _resume = null, _context = null;
  * Returns { pass: boolean }. Fail-open (pass=true) if no API key or on error.
  */
 async function scoreJobCoarseFilter(job) {
-  if (!process.env.GROQ_API_KEY) return { pass: true };
+  const llm = getLLM();
+  if (!llm.hasKey) return { pass: true };
 
   if (!_context) _context = readFile('context.md');
 
@@ -65,12 +76,11 @@ Description (first 500 chars): ${descSnippet}
 Respond ONLY with PASS or FAIL.`;
 
   try {
-    const text = await callGroq(prompt, { model: GROQ_FILTER_MODEL, maxTokens: 10 });
+    const text = await llm.callText(prompt, { model: llm.filterModel, maxTokens: 10 });
     const upper = text.toUpperCase().trim();
     if (upper.includes('FAIL')) return { pass: false };
     return { pass: true };
   } catch (e) {
-    // Fail open — don't block scoring on a filter error
     return { pass: true };
   }
 }
@@ -84,6 +94,7 @@ Respond ONLY with PASS or FAIL.`;
  * @returns {Promise<{ score: number, reasoning: string }>}
  */
 async function scoreJob(job) {
+  const llm = getLLM();
   if (!_resume) _resume = readFile('resume.md');
   if (!_context) _context = readFile('context.md');
 
@@ -111,7 +122,7 @@ Respond with ONLY valid JSON in this exact format:
 {"score": <integer 1-10>, "reasoning": "<2-4 sentences explaining the score>"}`;
 
   try {
-    const json = await callGroqJson(prompt, { model: GROQ_SCORE_MODEL, maxTokens: 400 });
+    const json = await llm.callJson(prompt, { model: llm.scoreModel, maxTokens: 400 });
     const score = typeof json.score === 'number'
       ? Math.min(10, Math.max(1, Math.round(json.score)))
       : null;
@@ -119,11 +130,11 @@ Respond with ONLY valid JSON in this exact format:
     if (score == null) throw new Error('score field missing from JSON response');
     return { score, reasoning };
   } catch (jsonErr) {
-    // Fall back to plain-text format
-    const text = await callGroq(prompt.replace(
+    const fallbackPrompt = prompt.replace(
       'Respond with ONLY valid JSON in this exact format:\n{"score": <integer 1-10>, "reasoning": "<2-4 sentences explaining the score>"}',
       'Respond in EXACTLY this format (no other text):\nSCORE: <integer 1-10>\nREASONING: <2-4 sentences explaining the score>'
-    ), { model: GROQ_SCORE_MODEL, maxTokens: 400 });
+    );
+    const text = await llm.callText(fallbackPrompt, { model: llm.scoreModel, maxTokens: 400 });
     return parseScoreResponse(text);
   }
 }
@@ -168,7 +179,7 @@ Identify the top 2-4 most likely reasons a recruiter or hiring manager would pas
 
 Respond in 2-4 plain sentences. No bullet points, no headers.`;
 
-  return await callGroq(prompt, { model: GROQ_SCORE_MODEL, maxTokens: 400 });
+  return await getLLM().callText(prompt, { model: getLLM().scoreModel, maxTokens: 400 });
 }
 
 // ---------------------------------------------------------------------------

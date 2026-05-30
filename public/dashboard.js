@@ -684,7 +684,7 @@ function wizardDone() {
         var pct = d.total > 0 ? Math.round((d.scored / d.total) * 100) : 0;
         var stateLabel;
         if (d.quotaExhausted) {
-          stateLabel = 'Daily Groq quota reached. Scored ' + d.scored + ' of ' + d.total + ' jobs so far — remaining ' + d.unscored + ' will be picked up on the next pipeline run.';
+          stateLabel = 'Daily Groq quota reached. Scored ' + d.scored + ' of ' + d.total + ' jobs — set Ollama Host in Settings to score locally with no quota limits.';
         } else if (d.total === 0) {
           stateLabel = 'Setting up your first job search — discovering companies and scraping job boards in the background. First jobs usually appear within 2–3 minutes.';
         } else if (d.scored === 0 && !d.active) {

@@ -2,7 +2,6 @@
 
 const { sleep, safeFetch, stripHtml } = require('../lib/utils');
 const { WORKDAY_COMPANIES, SEARCH_TERMS } = require('../config/companies');
-const { matchesSearchTerms } = require('../lib/scraper-utils');
 const { makeJobLead } = require('../lib/job-lead');
 
 // How many companies to query in parallel. Workday is tolerant of concurrent
@@ -35,7 +34,6 @@ async function scrapeCompany({ sub, wd, board, label }) {
     for (const job of r.value.jobPostings || []) {
       const jobId = `workday-${sub}-${job.externalPath?.split('/').pop() || job.title}`;
       if (seen.has(jobId)) continue;
-      if (!matchesSearchTerms(job.title)) continue;
       seen.add(jobId);
       const listLocation = job.locationsText || (Array.isArray(job.bulletFields) ? job.bulletFields[0] : '') || '';
       detailFetches.push({ job, jobId, listLocation });
