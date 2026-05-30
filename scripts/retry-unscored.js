@@ -24,7 +24,7 @@ function parseLimit(argv) {
 }
 
 async function run() {
-  requireEnv('GROQ_API_KEY');
+  if (!process.env.OLLAMA_HOST) requireEnv('GROQ_API_KEY');
 
   const limit = parseLimit(process.argv.slice(2));
   const db = getDb();
@@ -47,7 +47,7 @@ async function run() {
       const { score, reasoning } = await scoreJob(job);
 
       if (score == null) {
-        const error = reasoning || 'Gemini returned an unparsable score.';
+        const error = reasoning || 'Score returned null.';
         markJobScoreFailure(db, job.id, error);
         failed++;
         log.error('Retry scoring failed', { title: job.title, error });

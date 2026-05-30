@@ -2,6 +2,7 @@
 'use strict';
 
 const path = require('path');
+const fs = require('fs');
 const { spawnSync, spawn } = require('child_process');
 
 const { loadDashboardEnv, loadEnvFile } = require('../lib/env');
@@ -153,6 +154,17 @@ function runStepStreaming(repoRoot, label, args, { optional = false } = {}) {
   });
 }
 
+// Write current pipeline phase to data/pipeline-status.json so the dashboard
+// can show "Scraping..." vs "Scoring..." instead of a generic spinning indicator.
+function writePhase(profileDir, phase, step, runId) {
+  try {
+    fs.writeFileSync(
+      path.join(profileDir, 'pipeline-status.json'),
+      JSON.stringify({ phase, step, runId, updatedAt: new Date().toISOString() })
+    );
+  } catch {}
+}
+
 function printUsage() {
   console.log(`Usage: node scripts/refresh.js [flags]
 
@@ -201,12 +213,31 @@ async function main() {
   console.log('─'.repeat(60));
 
   if (!args.skipDiscover) {
+    writePhase(active.profileDir, 'discovering', 'Discovering companies', runId);
     runStep(repoRoot, 'Discovering new companies', ['scripts/discover-companies.js'], { optional: true });
   }
 
+  // Kick off background scoring of already-unscored jobs BEFORE the scrape starts.
+  // This way the ~12min scrape window isn't wasted — Ollama scores in parallel.
+  // SQLite WAL mode serialises concurrent writes safely.
+  const bgScorer = spawn(process.execPath, ['scripts/retry-unscored.js', '--limit=200'], {
+    cwd: repoRoot,
+    stdio: 'ignore',
+    env: process.env,
+  });
+  bgScorer.on('exit', (code) => {
+    const tag = runId ? `[refresh runId=${runId}]` : '[refresh]';
+    if (code === 0) console.log(`${formatLocalTime()}  ${tag}  Background scoring finished`);
+  });
+
+  writePhase(active.profileDir, 'scraping', 'Scraping jobs', runId);
   runStep(repoRoot, 'Scraping jobs', ['scraper.js']);
+
+  writePhase(active.profileDir, 'scoring', 'Running pipeline', runId);
   await runStepStreaming(repoRoot, 'Running pipeline', ['pipeline.js']);
   await runStepStreaming(repoRoot, 'Retrying unscored jobs', ['scripts/retry-unscored.js', '--limit=25'], { optional: true });
+
+  writePhase(active.profileDir, 'cleanup', 'Post-processing', runId);
 
   if (!args.skipDescriptions) {
     runStep(repoRoot, 'Checking description quality', ['scripts/check-descriptions.js'], { optional: true });
@@ -233,8 +264,11 @@ async function main() {
   runStep(repoRoot, 'Updating context files', ['scripts/update-context.js']);
 
   if (!args.skipDigest) {
+    writePhase(active.profileDir, 'sending-digest', 'Sending email digest', runId);
     runStep(repoRoot, 'Sending email digest', ['scripts/send-email-digest.js'], { optional: true });
   }
+
+  writePhase(active.profileDir, 'idle', 'Idle', runId);
 
   // Best-effort log retention sweep at end of every run.
   spawnSync(process.execPath, ['scripts/prune-logs.js'], {

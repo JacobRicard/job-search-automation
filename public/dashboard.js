@@ -694,16 +694,19 @@ function wizardDone() {
         }
         var pct = d.total > 0 ? Math.round((d.scored / d.total) * 100) : 0;
         var stateLabel;
+        var phase = d.phase || 'idle';
         if (d.quotaExhausted) {
           stateLabel = 'Daily Groq quota reached. Scored ' + d.scored + ' of ' + d.total + ' jobs — set Ollama Host in Settings to score locally with no quota limits.';
-        } else if (d.total === 0) {
-          stateLabel = 'Setting up your first job search — discovering companies and scraping job boards in the background. First jobs usually appear within 2–3 minutes.';
-        } else if (d.scored === 0 && !d.active) {
-          stateLabel = d.total + ' jobs imported. Scoring is about to start…';
-        } else if (d.scored === 0) {
-          stateLabel = 'Scoring your first jobs against your resume… (ETA ' + formatEta(d.etaSeconds) + ')';
+        } else if (d.total === 0 || phase === 'scraping') {
+          var scrapeMsg = phase === 'scraping' ? 'Scraping job boards' : 'Setting up';
+          var bgMsg = (d.unscored > 0 && phase === 'scraping') ? ' — scoring ' + d.unscored + ' queued jobs in background' : '';
+          stateLabel = scrapeMsg + bgMsg + '… scored jobs will appear automatically.';
+        } else if (phase === 'scoring' || d.active) {
+          stateLabel = 'Scoring ' + d.scored + ' of ' + d.total + ' — ' + d.unscored + ' remaining (ETA ' + formatEta(d.etaSeconds) + ')';
+        } else if (d.unscored > 0) {
+          stateLabel = d.unscored + ' jobs queued for scoring — will resume on next refresh cycle.';
         } else {
-          stateLabel = 'Scoring ' + d.scored + ' of ' + d.total + ' jobs against your resume — ETA ' + formatEta(d.etaSeconds) + '. Top matches appear at the top of the list as they score.';
+          stateLabel = 'Scoring ' + d.scored + ' of ' + d.total + ' jobs against your resume — ETA ' + formatEta(d.etaSeconds) + '.';
         }
         banner.style.display = 'flex';
         msgEl.textContent = stateLabel;
