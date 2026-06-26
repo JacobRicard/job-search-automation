@@ -271,6 +271,23 @@ async function main() {
 
   runStep(repoRoot, 'Updating context files', ['scripts/update-context.js']);
 
+  // Regenerate the environment setup script so it stays current with any profile edits.
+  // Saved to data/env-setup.sh (gitignored). Paste into Claude Code > Settings > Environment
+  // if you update your profile and need to refresh the cloud session restore script.
+  try {
+    const genResult = spawnSync('bash', ['scripts/gen-setup-script.sh'], {
+      cwd: repoRoot,
+      env: process.env,
+      encoding: 'utf8',
+    });
+    if (genResult.status === 0 && genResult.stdout) {
+      const envSetupPath = path.join(active.profileDir, 'env-setup.sh');
+      fs.writeFileSync(envSetupPath, genResult.stdout);
+      const tag = runId ? `[refresh runId=${runId}]` : '[refresh]';
+      console.log(`${formatLocalTime()}  ${tag}  Environment setup script updated → data/env-setup.sh`);
+    }
+  } catch {}
+
   if (!args.skipDigest) {
     writePhase(active.profileDir, 'sending-digest', 'Sending email digest', runId);
     runStep(repoRoot, 'Sending email digest', ['scripts/send-email-digest.js'], { optional: true });
