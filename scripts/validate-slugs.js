@@ -384,12 +384,7 @@ function parseJsonObject(text) {
 }
 
 async function discoverGeminiReplacementCandidates(ats, slug) {
-  if (!process.env.GEMINI_API_KEY) {
-    log.info('Gemini slug replacement discovery skipped', { ats, slug, reason: 'GEMINI_API_KEY is not set' });
-    return [];
-  }
-
-  const { callGemini } = require('../lib/gemini');
+  const { callGroqJson } = require('../lib/groq');
   const prompt = `Find replacement ATS job board slugs for this broken company slug.
 Return strict JSON only, with this shape:
 {"candidates":[{"ats":"Greenhouse|Lever|Ashby|Workable|Rippling","slug":"candidate-slug","url":"optional public board URL","note":"short reason"}]}
@@ -399,17 +394,16 @@ Broken slug: ${slug}
 Only include public ATS boards likely to belong to the same company.`;
 
   try {
-    const text = await callGemini(prompt, 1, 1200);
-    const parsed = parseJsonObject(text);
+    const parsed = await callGroqJson(prompt);
     const candidates = Array.isArray(parsed?.candidates) ? parsed.candidates : [];
     return verifyCandidateList(candidates.map(c => ({
       ats: c.ats,
       slug: c.slug,
       url: c.url,
-      note: c.note || 'Verified Gemini candidate',
+      note: c.note || 'Verified Claude candidate',
     })), { ats, slug });
   } catch (e) {
-    log.warn('Gemini slug replacement discovery failed', { ats, slug, error: e.message });
+    log.warn('Claude slug replacement discovery failed', { ats, slug, error: e.message });
     return [];
   }
 }
