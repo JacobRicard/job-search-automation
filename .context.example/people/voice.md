@@ -17,7 +17,7 @@ If it sounds like it belongs in a LinkedIn thought leader post, delete it.
 ## Tone
 
 - Direct and confident without being arrogant
-- Specific over general. Always use real numbers, company names, and concrete examples from the source files in `profiles/example/`
+- Specific over general. Always use real numbers, company names, and concrete examples from the source files in `data/`
 - Conversational. Write like the applicant talks, not like a cover letter template.
 - Casual and genuine. Words like "genuinely," "really," "pretty" are on-brand when they fit. Don't polish or formalize natural reactions.
 - Honest about gaps or uncertainty. "I forget the exact instance type" or "blockchain is new to me" reads as human. Smooth overconfidence reads as AI.
@@ -51,7 +51,7 @@ Before finalizing any sentence: would the applicant actually say this to a colle
 
 ## Source material
 
-Always read `profiles/example/context.md` and `profiles/example/career-detail.md` before drafting anything in the applicant's voice. These contain their actual words and honest assessments, not polished marketing copy.
+Always read `data/context.md` and `data/career-detail.md` before drafting anything in the applicant's voice. These contain their actual words and honest assessments, not polished marketing copy.
 
 ## Example (bad vs good)
 
