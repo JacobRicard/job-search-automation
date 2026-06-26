@@ -742,3 +742,68 @@ function wizardDone() {
   window.pageComparison = function (d) { page = Math.max(0, Math.min(pages - 1, page + d)); show(); };
   show();
 })();
+
+// ---------------------------------------------------------------------------
+// Selection pipeline — select jobs, then Copy for Claude or Delete
+// ---------------------------------------------------------------------------
+
+function updateResumeBar() {
+  var count = document.querySelectorAll('.job-select-btn.selected').length;
+  var bar = document.getElementById('resume-action-bar');
+  var countEl = document.getElementById('resume-bar-count');
+  if (!bar) return;
+  if (count > 0) {
+    bar.style.display = 'flex';
+    if (countEl) countEl.textContent = count + ' job' + (count === 1 ? '' : 's') + ' selected';
+  } else {
+    bar.style.display = 'none';
+    if (countEl) countEl.textContent = '';
+  }
+}
+
+function toggleResume(id, value, btn) {
+  fetch('/toggle-resume', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id: id, value: value }) })
+    .then(function(r) { return r.json(); })
+    .then(function(d) {
+      if (!d.ok) return;
+      btn.classList.toggle('selected', value === 1);
+      btn.innerHTML = value === 1 ? ICON_CHECK : '';
+      btn.onclick = function() { toggleResume(id, value === 1 ? 0 : 1, btn); };
+      btn.title = value === 1 ? 'Deselect' : 'Select';
+      updateResumeBar();
+    });
+}
+
+function copyForClaude(btn) {
+  btn.disabled = true;
+  var msg = document.getElementById('resume-bar-msg');
+  fetch('/api/resume-export')
+    .then(function(r) { return r.ok ? r.json() : r.json().then(function(d) { throw new Error(d.error); }); })
+    .then(function(d) {
+      return navigator.clipboard.writeText(JSON.stringify(d, null, 2));
+    })
+    .then(function() {
+      if (msg) { msg.textContent = 'Copied!'; msg.style.color = 'var(--green)'; }
+      setTimeout(function() { if (msg) msg.textContent = ''; btn.disabled = false; }, 3000);
+    })
+    .catch(function(e) {
+      if (msg) { msg.textContent = e.message || 'Copy failed'; msg.style.color = 'var(--red)'; }
+      btn.disabled = false;
+    });
+}
+
+function deleteUnselected(btn) {
+  var count = document.querySelectorAll('.job-select-btn.selected').length;
+  if (!confirm('Delete ' + count + ' selected job' + (count === 1 ? '' : 's') + '? This cannot be undone.')) return;
+  btn.disabled = true;
+  var msg = document.getElementById('resume-bar-msg');
+  fetch('/delete-unselected', { method: 'DELETE' })
+    .then(function(r) { return r.json(); })
+    .then(function(d) {
+      if (d.ok) location.reload();
+      else { if (msg) msg.textContent = 'Delete failed'; btn.disabled = false; }
+    })
+    .catch(function() { btn.disabled = false; });
+}
+
+updateResumeBar();
