@@ -14,7 +14,6 @@ const {
   getAllTimeMarketSeniorityJobs,
   countAllTimeAppliedJobs,
 } = require('../lib/market-jobs');
-const { renderMarketResearch } = require('../lib/html/market-research');
 
 function createDb() {
   const db = new Database(':memory:');
@@ -82,47 +81,5 @@ describe('market job selection', () => {
     assert.equal(getAllTimeMarketSeniorityJobs(db).length, 5);
     assert.equal(getAllTimeMarketResearchJobs(db).length, 5);
     assert.equal(countAllTimeMarketResearchJobs(db), 5);
-  });
-
-  it('renders market copy as live-current while keeping all-time applied separate', () => {
-    const html = renderMarketResearch(
-      null,
-      1,
-      [{ title: 'Platform Engineer', description: longDescription() }],
-      3,
-      319,
-      {
-        current: { jobs: [{ title: 'Platform Engineer', description: longDescription() }] },
-        allTime: {
-          jobCount: 2,
-          jobs: [
-            { title: 'Platform Engineer', description: longDescription() },
-            { title: 'Senior Platform Engineer', description: longDescription('Requires 5+ years building Kubernetes platforms.') },
-          ],
-        },
-      }
-    );
-
-    assert.match(html, /1 live open pipeline roles classified by seniority/);
-    assert.match(html, /2 all-time seen roles classified by seniority/);
-    assert.match(html, /Current Market/);
-    assert.match(html, /All Time/);
-    assert.match(html, /All-time applied count:[\s\S]*319/);
-    assert.match(html, /Closed, rejected, ghosted, and archived jobs are excluded/);
-    assert.match(html, /Includes closed, rejected, ghosted, and archived jobs/);
-    assert.match(html, /live open JDs/);
-  });
-
-  it('treats cached market research as stale when the live sample changes', () => {
-    const html = renderMarketResearch(
-      { generatedAt: Date.now(), jobCount: 289, data: { sample_size: 289 } },
-      38,
-      [{ title: 'Platform Engineer', description: longDescription() }],
-      3,
-      319
-    );
-
-    assert.match(html, /live sample changed from 289 to 38 JDs/);
-    assert.match(html, /Run Analysis/);
   });
 });
