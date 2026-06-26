@@ -106,7 +106,7 @@ Strong fits (8+/10): ${highScored.length > 0 ? highScored.map(j => `${j.company}
 }
 
 async function run() {
-  if (!process.env.OLLAMA_HOST) requireEnv('GROQ_API_KEY');
+  if (!process.env.OLLAMA_HOST && !process.env.CLAUDE_CODE_EXECPATH) requireEnv('GROQ_API_KEY');
   const scrapedLeads = validateWithPydantic(JSON.parse(fs.readFileSync(jobsJsonPath, 'utf8')));
   const scrapedRaw = scrapedLeads.map(jobLeadToInternal);
 

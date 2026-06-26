@@ -15,9 +15,11 @@ const path = require('path');
 const { execSync } = require('child_process');
 const Database = require('better-sqlite3');
 
+const { loadDashboardEnv } = require('../lib/env');
 const REPO_ROOT = path.join(__dirname, '..');
+loadDashboardEnv(REPO_ROOT);
 const CONTEXT_DIR = path.join(REPO_ROOT, '.context');
-const DB_PATH = process.env.JOB_DB_PATH || path.join(REPO_ROOT, 'profiles', 'example', 'jobs.db');
+const { dbPath: DB_PATH } = require('../config/paths');
 
 function run(cmd) {
   return execSync(cmd, { cwd: REPO_ROOT, encoding: 'utf8' }).trim();
