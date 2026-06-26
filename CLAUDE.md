@@ -15,6 +15,9 @@ cp -r .context.example .context
 
 Then edit both to reflect you. `.context/` and `data/` are gitignored.
 
+**At session start, check setup first:**
+Before reading anything else, verify that `data/context.md`, `data/resume.md`, and `data/companies.js` all exist and are not blank templates (i.e. do not start with `# [Your Name]`). If any are missing or blank, immediately start the `/setup` interview — ask the user the questions in the conversation and write the files. Do not proceed to the context load until setup is complete.
+
 **At session start, always read:**
 - `.context/people/applicant.md` — who the applicant is, working preferences
 - `.context/people/voice.md` — writing rules (critical for anything in the applicant's voice)
@@ -42,7 +45,8 @@ The following commands are available in both Claude Code (`.claude/commands/`) a
 
 | Command | When to use |
 |---|---|
-| `/load-context` | Start of any job-search or career session. Reads `.context/` and the active profile. |
+| `/setup` | First run, or when `data/` profile files are missing or unconfigured. Claude asks questions and writes the files. Runs automatically when files are missing. |
+| `/load-context` | Start of any job-search or career session. Reads `.context/` and the active profile. Runs `/setup` automatically if files are missing. |
 | `/job-search` | Review pending listings, approve/reject, check stats, run the pipeline. |
 | `/interview-prep [company, email, or JD]` | Full interview prep: tell me about yourself, behavioral stories, match points, tech areas to review, questions to ask. Works for phone screens and second rounds. |
 | `/app-questions [question text]` | Answer application form questions in the applicant's voice. |
