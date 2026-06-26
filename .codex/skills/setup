@@ -189,10 +189,35 @@ Full detail in `data/context.md` and `data/career-detail.md`. Read those before 
 
 ## After writing all files
 
-Tell the user:
-1. What was written and what still needs their attention (placeholder sections)
-2. That the pipeline can now run: `node scripts/refresh.js`
-3. That they can refine their profile any time by editing the files in `data/`
-4. Offer to run `/load-context` to fully load their new profile into this session
+Tell the user what was written and what still needs their attention (placeholder sections).
+
+Then run:
+
+```bash
+bash scripts/gen-setup-script.sh
+```
+
+Show the **full output** of that command in a code block, then say exactly this:
+
+---
+
+**One-time step to make your profile persist across sessions:**
+
+Since this repo is public, your data files can't be committed. Instead, paste the script above into Claude Code as an environment setup script — it runs once at container start and restores your files automatically.
+
+Steps:
+1. Copy the entire script above
+2. Open **Claude Code** (web or desktop) → click your avatar → **Settings**
+3. Find **Environment** → **Setup script**
+4. Paste and save
+
+That's it. Every future cloud session will restore your profile before Claude Code starts. You won't need to run `/setup` again.
+
+---
+
+After that, tell the user:
+- The pipeline can now run: `node scripts/refresh.js`
+- They can update their profile any time by editing `data/` files locally, then re-run `bash scripts/gen-setup-script.sh` and paste the new script into environment settings
+- Offer to run `/load-context` to fully load the new profile into this session
 
 Do not write any setup summary document — keep it in the conversation.

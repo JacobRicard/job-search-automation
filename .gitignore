@@ -23,7 +23,9 @@ jobs.json
 transcript.md
 public/bookmarklet.js
 
-# Personal data directory (copy data.example to data to set up)
+# Personal data — ignored so the public template stays clean.
+# After running /setup, use the generated environment setup script to restore
+# files in each cloud session (one-time paste into Claude Code environment settings).
 /.context/
 /data/
 
