@@ -1,6 +1,5 @@
 'use strict';
 
-const { requireEnv } = require('../lib/env');
 const {
   getDb,
   getUnscoredJobs,
@@ -24,8 +23,6 @@ function parseLimit(argv) {
 }
 
 async function run() {
-  if (!process.env.OLLAMA_HOST && !process.env.CLAUDE_CODE_EXECPATH) requireEnv('GROQ_API_KEY');
-
   const limit = parseLimit(process.argv.slice(2));
   const db = getDb();
   const toScore = getUnscoredJobs(db, { limit });

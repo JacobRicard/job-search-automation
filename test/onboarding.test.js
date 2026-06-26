@@ -239,7 +239,6 @@ describe('setup HTTP handlers', () => {
   let port;
   let tmpDir;
   let envPath;
-  const savedGroqKey = process.env.GROQ_API_KEY;
   const savedGeminiKey = process.env.GEMINI_API_KEY;
 
   before(async () => {
@@ -255,20 +254,17 @@ describe('setup HTTP handlers', () => {
       server.close((err) => err ? reject(err) : resolve());
     });
     rmDir(tmpDir);
-    if (savedGroqKey === undefined) delete process.env.GROQ_API_KEY;
-    else process.env.GROQ_API_KEY = savedGroqKey;
     if (savedGeminiKey === undefined) delete process.env.GEMINI_API_KEY;
     else process.env.GEMINI_API_KEY = savedGeminiKey;
   });
 
-  it('GET /api/setup/status returns empty strings and hasKey false when no files exist', async () => {
-    delete process.env.GROQ_API_KEY;
+  it('GET /api/setup/status returns empty strings and hasKey true when no files exist', async () => {
     const { status, body } = await get(port, '/api/setup/status');
     assert.equal(status, 200);
     assert.equal(body.resumeContent, '');
     assert.equal(body.contextContent, '');
     assert.equal(body.companiesContent, '');
-    assert.equal(body.hasKey, false);
+    assert.equal(body.hasKey, true);
   });
 
   it('GET /api/setup/status returns resumeContent when resume.md exists', async () => {
@@ -276,13 +272,6 @@ describe('setup HTTP handlers', () => {
     const { body } = await get(port, '/api/setup/status');
     assert.equal(body.resumeContent, 'Jane Doe resume');
     fs.rmSync(path.join(tmpDir, 'resume.md'));
-  });
-
-  it('GET /api/setup/status returns hasKey true when GROQ_API_KEY is set', async () => {
-    process.env.GROQ_API_KEY = 'gsk_test-key';
-    const { body } = await get(port, '/api/setup/status');
-    assert.equal(body.hasKey, true);
-    delete process.env.GROQ_API_KEY;
   });
 
   it('POST /api/setup/resume writes resume.md and returns ok', async () => {
@@ -328,28 +317,20 @@ describe('setup HTTP handlers', () => {
     delete require.cache[require.resolve(companiesPath)];
   });
 
-  it('POST /api/setup/api-key writes GROQ_API_KEY to .env', async () => {
-    const { status, body } = await post(port, '/api/setup/api-key', { key: 'gsk_TestKey123' });
-    assert.equal(status, 200);
-    assert.equal(body.ok, true);
-    const content = fs.readFileSync(envPath, 'utf8');
-    assert.ok(content.includes('GROQ_API_KEY=gsk_TestKey123'));
-  });
-
-  it('POST /api/setup/api-key with empty key does not touch .env', async () => {
+  it('POST /api/setup/api-key is a no-op and returns ok', async () => {
     fs.writeFileSync(envPath, 'EXISTING=value\n', 'utf8');
-    const { status, body } = await post(port, '/api/setup/api-key', { key: '' });
+    const { status, body } = await post(port, '/api/setup/api-key', { key: 'ignored' });
     assert.equal(status, 200);
     assert.equal(body.ok, true);
     const content = fs.readFileSync(envPath, 'utf8');
     assert.equal(content, 'EXISTING=value\n');
   });
 
-  it('POST /api/setup/test-key with no key returns 400', async () => {
-    const { status, body } = await post(port, '/api/setup/test-key', { key: '' });
-    assert.equal(status, 400);
-    assert.equal(body.ok, false);
-    assert.equal(body.error, 'No key provided');
+  it('POST /api/setup/test-key checks claude CLI reachability', async () => {
+    const { status, body } = await post(port, '/api/setup/test-key', {});
+    assert.equal(status, 200);
+    // ok=true if claude is in PATH, ok=false if not — either is a valid response
+    assert.equal(typeof body.ok, 'boolean');
   });
 
   // --- regression: wizard PDF upload showed "no_key" even after key was saved ---
@@ -362,52 +343,15 @@ describe('setup HTTP handlers', () => {
     assert.equal(body.error, 'no_gemini_key');
   });
 
-  it('POST /api/setup/api-key sets process.env.GROQ_API_KEY immediately for subsequent requests', async () => {
-    delete process.env.GROQ_API_KEY;
-    const { status, body } = await post(port, '/api/setup/api-key', { key: 'gsk_RuntimeTestKey' });
-    assert.equal(status, 200);
-    assert.equal(body.ok, true);
-    assert.equal(process.env.GROQ_API_KEY, 'gsk_RuntimeTestKey');
-    delete process.env.GROQ_API_KEY;
-  });
-
-  it('GET /api/setup/status returns hasKey true immediately after saving key via api-key endpoint', async () => {
-    delete process.env.GROQ_API_KEY;
-    await post(port, '/api/setup/api-key', { key: 'gsk_SequenceKey' });
+  it('GET /api/setup/status always returns hasKey true (Claude CLI needs no key)', async () => {
     const { body } = await get(port, '/api/setup/status');
     assert.equal(body.hasKey, true);
-    delete process.env.GROQ_API_KEY;
   });
 
-  it('POST /api/setup/resume with pdf format returns no_gemini_key when only GROQ key is saved', async () => {
+  it('POST /api/setup/resume with pdf format returns no_gemini_key when GEMINI_API_KEY is not set', async () => {
     delete process.env.GEMINI_API_KEY;
-    delete process.env.GROQ_API_KEY;
-    await post(port, '/api/setup/api-key', { key: 'gsk_AfterSaveKey' });
-    // Saving the Groq key does not satisfy the Gemini PDF check —
-    // error should be no_gemini_key (not no_key, the old gate name)
     const { body } = await post(port, '/api/setup/resume', { content: 'dGVzdA==', format: 'pdf' });
     assert.equal(body.error, 'no_gemini_key');
-    delete process.env.GROQ_API_KEY;
-  });
-
-  it('POST /api/setup/api-key trims whitespace before saving', async () => {
-    delete process.env.GROQ_API_KEY;
-    await post(port, '/api/setup/api-key', { key: '  gsk_TrimTest  ' });
-    assert.equal(process.env.GROQ_API_KEY, 'gsk_TrimTest');
-    const content = fs.readFileSync(envPath, 'utf8');
-    assert.ok(content.includes('GROQ_API_KEY=gsk_TrimTest'));
-    assert.ok(!content.includes(' gsk_TrimTest'));
-    delete process.env.GROQ_API_KEY;
-  });
-
-  it('POST /api/setup/api-key with whitespace-only key does not save', async () => {
-    delete process.env.GROQ_API_KEY;
-    fs.writeFileSync(envPath, 'EXISTING=keep\n', 'utf8');
-    await post(port, '/api/setup/api-key', { key: '   ' });
-    assert.equal(process.env.GROQ_API_KEY, undefined);
-    const content = fs.readFileSync(envPath, 'utf8');
-    assert.ok(!content.includes('GROQ_API_KEY'));
-    assert.ok(content.includes('EXISTING=keep'));
   });
 });
 

@@ -10,7 +10,6 @@
 const fs = require('fs');
 
 const { jobsJsonPath } = require('./config/paths');
-const { requireEnv } = require('./lib/env');
 const {
   getDb,
   getExistingJobKeys,
@@ -21,8 +20,7 @@ const {
   updateJobScore,
 } = require('./lib/db');
 const { scoreJob, scoreJobCoarseFilter } = require('./scorer');
-const { callGroq, GROQ_SCORE_MODEL: MODEL } = require('./lib/groq');
-const { GROQ_DAILY_LIMIT } = require('./config/constants');
+const { callLLM, LLM_SCORE_MODEL: MODEL } = require('./lib/claude-llm');
 const { classifyComplexity } = require('./lib/complexity');
 const { isPrimaryPlatform } = require('./lib/ats-resolver');
 const { jobLeadToInternal, validateWithPydantic } = require('./lib/job-lead');
@@ -30,10 +28,8 @@ const { normalizeScrapedJobs } = require('./scripts/resolve-ats-aliases');
 const { getHistoricalStageStats } = require('./lib/stage-stats');
 const { mapConcurrent } = require('./lib/concurrency');
 
-// Score multiple jobs in flight at once. Throughput is still bounded by the
-// Groq slot reservation (GROQ_RATE_DELAY_MS); concurrency only overlaps
-// network latency so it doesn't add on top of the pacing.
-// Ollama queues on a single GPU — concurrency > 1 wastes memory without improving throughput.
+// Ollama queues on a single GPU — keep concurrency at 1 to avoid OOM.
+// Claude CLI concurrency is fine at 3 (each call is a separate process).
 const SCORING_CONCURRENCY = process.env.OLLAMA_HOST
   ? 1
   : (parseInt(process.env.SCORING_CONCURRENCY, 10) || 3);
@@ -93,7 +89,7 @@ Strong fits (8+/10): ${highScored.length > 0 ? highScored.map(j => `${j.company}
 
     const callText = process.env.OLLAMA_HOST
       ? require('./lib/ollama').callOllama
-      : (p, o) => callGroq(p, o);
+      : callLLM;
     const summaryModel = process.env.OLLAMA_HOST
       ? require('./lib/ollama').OLLAMA_SCORE_MODEL
       : MODEL;
@@ -106,7 +102,6 @@ Strong fits (8+/10): ${highScored.length > 0 ? highScored.map(j => `${j.company}
 }
 
 async function run() {
-  if (!process.env.OLLAMA_HOST && !process.env.CLAUDE_CODE_EXECPATH) requireEnv('GROQ_API_KEY');
   const scrapedLeads = validateWithPydantic(JSON.parse(fs.readFileSync(jobsJsonPath, 'utf8')));
   const scrapedRaw = scrapedLeads.map(jobLeadToInternal);
 
@@ -230,35 +225,18 @@ async function run() {
   });
   const { inserted, skipped, refreshed, reopened } = insertAndDedup(scraped);
 
-  // Score unscored jobs. Ollama has no quota cap — score everything.
   const usingOllama = !!process.env.OLLAMA_HOST;
-  const todayStr = new Date().toLocaleDateString('en-CA');
-  const usedToday = usingOllama ? 0 : db.prepare(
-    "SELECT COALESCE(SUM(call_count), 0) as n FROM api_usage WHERE date = ? AND model = ?"
-  ).get(todayStr, MODEL).n;
-  const remainingQuota = usingOllama ? Infinity : Math.max(0, GROQ_DAILY_LIMIT - usedToday - 10);
-  const scoringCandidates = usingOllama
-    ? getUnscoredJobs(db)
-    : getUnscoredJobs(db, { limit: remainingQuota });
+  const scoringCandidates = getUnscoredJobs(db);
   const firstRun = db.prepare("SELECT COUNT(*) AS n FROM jobs WHERE score IS NOT NULL").get().n < 10;
   const scoringPlan = getScoringPlan(scoringCandidates, process.env, { firstRun });
   if (scoringPlan.spikeDetected) {
-    log.info('High scoring volume (daily quota still caps the batch)', {
+    log.info('High scoring volume', {
       candidates: scoringCandidates.length,
       threshold: scoringPlan.threshold,
-      remainingQuota,
       firstRun,
     });
   }
   const toScore = scoringPlan.jobs;
-  if (!usingOllama && (usedToday > 0 || remainingQuota < GROQ_DAILY_LIMIT)) {
-    log.info('Daily quota check', {
-      usedToday,
-      remainingQuota,
-      toScore: scoringCandidates.length,
-      scoringQueued: toScore.length,
-    });
-  }
 
   const archiveThreshold = parseInt(process.env.AUTO_ARCHIVE_THRESHOLD, 10) || 4;
   const autoArchive = db.prepare("UPDATE jobs SET status='archived', updated_at=datetime('now') WHERE id=? AND score <= ?");
@@ -273,14 +251,9 @@ async function run() {
     log.info('Scoring started', { total: scoreTotal });
   }
 
-  const QUOTA_RE = /exceeded your current quota|RESOURCE_EXHAUSTED|quota.*exceeded|billing.*quota|rate_limit_exceeded|rate limit/i;
-  let quotaExhausted = false;
   let processed = 0;
 
   await mapConcurrent(toScore, SCORING_CONCURRENCY, async (job) => {
-    // Once quota is exhausted, drain the remaining workers without spending
-    // more calls (replaces the old loop `break`).
-    if (quotaExhausted) return;
     markJobScoreAttempt(db, job.id);
 
     try {
@@ -299,11 +272,10 @@ async function run() {
       const { score, reasoning } = await scoreJob(job);
 
       if (score == null) {
-        const error = reasoning || 'Groq returned an unparsable score.';
+        const error = reasoning || 'LLM returned an unparsable score.';
         markJobScoreFailure(db, job.id, error);
         scoredFailed++;
         log.error('Scoring failed', { title: job.title, error });
-        if (QUOTA_RE.test(error)) quotaExhausted = true;
       } else {
         updateJobScore(db, job.id, score, reasoning);
         scoredOk++;
@@ -313,7 +285,6 @@ async function run() {
       markJobScoreFailure(db, job.id, e.message);
       scoredFailed++;
       log.error('Scoring failed', { title: job.title, error: e.message });
-      if (QUOTA_RE.test(e.message || '')) quotaExhausted = true;
     }
 
     const done = ++processed;
@@ -331,17 +302,6 @@ async function run() {
       });
     }
   });
-
-  if (quotaExhausted) {
-    const remaining = scoreTotal - processed;
-    log.warn('Daily quota exhausted; stopping scoring loop early', {
-      scoredOk,
-      scoredFailed,
-      processed,
-      remaining,
-      hint: usingOllama ? 'Ollama timeout or error.' : 'Remaining jobs will be picked up by the next pipeline run.',
-    });
-  }
 
   // Classify application complexity for scored jobs (any non-archived status)
   const toClassify = db.prepare(

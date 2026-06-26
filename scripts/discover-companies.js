@@ -16,7 +16,7 @@ const repoRoot = path.resolve(__dirname, '..');
 loadDashboardEnv(repoRoot);
 
 const { SEARCH_TERMS, GREENHOUSE_COMPANIES, ASHBY_COMPANIES, LEVER_COMPANIES, WORKDAY_COMPANIES } = require('../config/companies');
-const { callGroqJson }                 = require('../lib/groq');
+const { callLLMJson }                  = require('../lib/claude-llm');
 const { parseGeminiJsonArray }              = require('../lib/ats-resolver');
 const { loadSuggested, saveSuggested, allSlugs } = require('../lib/suggested-companies');
 const createLogger                     = require('../lib/logger');
@@ -199,7 +199,7 @@ async function runDiscoveryPass(suggested, staticSlugs, contextSnippet, candidat
 
   let candidates;
   try {
-    const result = await callGroqJson(buildPrompt(allTracked, contextSnippet, candidateCount));
+    const result = await callLLMJson(buildPrompt(allTracked, contextSnippet, candidateCount));
     const arr = Array.isArray(result) ? result : (Array.isArray(result?.candidates) ? result.candidates : []);
     candidates = arr.filter((c) => c && typeof c === 'object' && c.slug && c.platform);
   } catch (err) {

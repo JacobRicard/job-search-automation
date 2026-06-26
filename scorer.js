@@ -1,11 +1,9 @@
 /**
  * scorer.js
- * Uses the Groq API to score a job listing 1-10 against resume.md and context.md.
+ * Scores a job listing 1-10 against resume.md and context.md using Claude CLI.
  * Two-step pipeline:
- *   Step 1 (scoreJobCoarseFilter): llama-3.1-8b-instant — PASS/FAIL relevance gate
- *   Step 2 (scoreJob):             llama-3.3-70b-versatile — full 1-10 score with reasoning
- *
- * Requires: GROQ_API_KEY environment variable
+ *   Step 1 (scoreJobCoarseFilter): fast model — PASS/FAIL relevance gate
+ *   Step 2 (scoreJob):             full model — 1-10 score with reasoning
  *
  * Usage (standalone):
  *   echo '[{"title":"...","company":"...","description":"..."}]' | node scorer.js
@@ -22,18 +20,16 @@ const path = require('path');
 const { MAX_DESCRIPTION_LENGTH } = require('./config/constants');
 const createLogger = require('./lib/logger');
 const { baseDir } = require('./config/paths');
-const { callGroq, callGroqJson, GROQ_FILTER_MODEL, GROQ_SCORE_MODEL } = require('./lib/groq');
+const { callLLM, callLLMJson, LLM_FILTER_MODEL, LLM_SCORE_MODEL } = require('./lib/claude-llm');
 
 // Returns the right LLM call functions based on env config.
-// Prefers Ollama when OLLAMA_HOST is set; falls back to Groq.
+// Prefers Ollama when OLLAMA_HOST is set; falls back to Claude CLI.
 function getLLM() {
   if (process.env.OLLAMA_HOST) {
     const { callOllama, callOllamaJson, OLLAMA_FILTER_MODEL, OLLAMA_SCORE_MODEL } = require('./lib/ollama');
-    return { callText: callOllama, callJson: callOllamaJson, filterModel: OLLAMA_FILTER_MODEL, scoreModel: OLLAMA_SCORE_MODEL, hasKey: true };
+    return { callText: callOllama, callJson: callOllamaJson, filterModel: OLLAMA_FILTER_MODEL, scoreModel: OLLAMA_SCORE_MODEL };
   }
-  // hasKey is true when Groq key is set OR when falling back to Claude CLI
-  const hasKey = !!process.env.GROQ_API_KEY || !!process.env.CLAUDE_CODE_EXECPATH;
-  return { callText: callGroq, callJson: callGroqJson, filterModel: GROQ_FILTER_MODEL, scoreModel: GROQ_SCORE_MODEL, hasKey };
+  return { callText: callLLM, callJson: callLLMJson, filterModel: LLM_FILTER_MODEL, scoreModel: LLM_SCORE_MODEL };
 }
 
 function readFile(filename) {
@@ -57,7 +53,6 @@ let _resume = null, _context = null;
  */
 async function scoreJobCoarseFilter(job) {
   const llm = getLLM();
-  if (!llm.hasKey) return { pass: true };
 
   if (!_context) _context = readFile('context.md');
 

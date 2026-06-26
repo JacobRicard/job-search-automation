@@ -384,7 +384,7 @@ function parseJsonObject(text) {
 }
 
 async function discoverGeminiReplacementCandidates(ats, slug) {
-  const { callGroqJson } = require('../lib/groq');
+  const { callLLMJson } = require('../lib/claude-llm');
   const prompt = `Find replacement ATS job board slugs for this broken company slug.
 Return strict JSON only, with this shape:
 {"candidates":[{"ats":"Greenhouse|Lever|Ashby|Workable|Rippling","slug":"candidate-slug","url":"optional public board URL","note":"short reason"}]}
@@ -394,7 +394,7 @@ Broken slug: ${slug}
 Only include public ATS boards likely to belong to the same company.`;
 
   try {
-    const parsed = await callGroqJson(prompt);
+    const parsed = await callLLMJson(prompt);
     const candidates = Array.isArray(parsed?.candidates) ? parsed.candidates : [];
     return verifyCandidateList(candidates.map(c => ({
       ats: c.ats,

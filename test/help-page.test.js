@@ -11,7 +11,7 @@ describe('help page', () => {
 
     assert.match(html, /Run It Locally/);
     assert.match(html, /docker compose up -d/);
-    assert.match(html, /console\.groq\.com/);
+    assert.match(html, /claude\.ai\/code/);
     assert.match(html, /free/i);
     assert.doesNotMatch(html, /NPM Commands/);
     assert.doesNotMatch(html, /npm run apply/);
