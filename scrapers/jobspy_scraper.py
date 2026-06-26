@@ -108,12 +108,16 @@ def get_locations(config: dict) -> list[str | None]:
     Return a list of locations to scrape.
     LOCATION_FILTER env var (comma-separated, same var used by the pipeline allowlist)
     takes precedence over the config "location" field.
+    "location" in config may be a string or a list of strings.
     Returns [None] if no location is specified (scrape without location filter).
     """
     env_locations = os.environ.get("LOCATION_FILTER", "").strip()
     if env_locations:
         return [loc.strip() for loc in env_locations.split(",") if loc.strip()]
     config_location = config.get("location")
+    if isinstance(config_location, list):
+        locs = [str(loc).strip() for loc in config_location if loc and str(loc).strip()]
+        return locs if locs else [None]
     if config_location:
         return [str(config_location).strip()]
     return [None]
