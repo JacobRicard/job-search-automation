@@ -31,7 +31,9 @@ function getLLM() {
     const { callOllama, callOllamaJson, OLLAMA_FILTER_MODEL, OLLAMA_SCORE_MODEL } = require('./lib/ollama');
     return { callText: callOllama, callJson: callOllamaJson, filterModel: OLLAMA_FILTER_MODEL, scoreModel: OLLAMA_SCORE_MODEL, hasKey: true };
   }
-  return { callText: callGroq, callJson: callGroqJson, filterModel: GROQ_FILTER_MODEL, scoreModel: GROQ_SCORE_MODEL, hasKey: !!process.env.GROQ_API_KEY };
+  // hasKey is true when Groq key is set OR when falling back to Claude CLI
+  const hasKey = !!process.env.GROQ_API_KEY || !!process.env.CLAUDE_CODE_EXECPATH;
+  return { callText: callGroq, callJson: callGroqJson, filterModel: GROQ_FILTER_MODEL, scoreModel: GROQ_SCORE_MODEL, hasKey };
 }
 
 function readFile(filename) {

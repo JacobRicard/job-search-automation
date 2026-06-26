@@ -2,7 +2,7 @@
 'use strict';
 
 /**
- * Uses Gemini to suggest companies based on the user's profile, verifies
+ * Uses Claude CLI to suggest companies based on the user's profile, verifies
  * each company has an active ATS board, then appends verified companies to
  * data/suggested-companies.json so they're scraped on the next run.
  */
@@ -16,7 +16,7 @@ const repoRoot = path.resolve(__dirname, '..');
 loadDashboardEnv(repoRoot);
 
 const { SEARCH_TERMS, GREENHOUSE_COMPANIES, ASHBY_COMPANIES, LEVER_COMPANIES, WORKDAY_COMPANIES } = require('../config/companies');
-const { callGemini }                   = require('../lib/gemini');
+const { callGroqJson }                 = require('../lib/groq');
 const { parseGeminiJsonArray }              = require('../lib/ats-resolver');
 const { loadSuggested, saveSuggested, allSlugs } = require('../lib/suggested-companies');
 const createLogger                     = require('../lib/logger');
@@ -197,19 +197,16 @@ async function runDiscoveryPass(suggested, staticSlugs, contextSnippet, candidat
   const suggestedSlugSet = allSlugs(suggested);
   const allTracked = new Set([...staticSlugs, ...suggestedSlugSet]);
 
-  const maxOutputTokens = getDiscoveryMaxOutputTokens(candidateCount);
-  let raw;
+  let candidates;
   try {
-    raw = await callGemini(buildPrompt(allTracked, contextSnippet, candidateCount), undefined, maxOutputTokens);
+    const result = await callGroqJson(buildPrompt(allTracked, contextSnippet, candidateCount));
+    const arr = Array.isArray(result) ? result : (Array.isArray(result?.candidates) ? result.candidates : []);
+    candidates = arr.filter((c) => c && typeof c === 'object' && c.slug && c.platform);
   } catch (err) {
-    log.error('Gemini call failed', { error: err.message });
+    log.error('Claude discovery call failed', { error: err.message });
     return 0;
   }
-
-  const candidates = parseGeminiJsonArray(raw).filter(
-    (c) => c && typeof c === 'object' && c.slug && c.platform,
-  );
-  log.info('Gemini returned candidates', { count: candidates.length });
+  log.info('Claude returned candidates', { count: candidates.length });
 
   const novel = candidates.filter((c) => !allTracked.has(c.slug.toLowerCase()));
   log.info('Novel candidates after dedup', { count: novel.length });
@@ -268,10 +265,7 @@ async function runDiscoveryPass(suggested, staticSlugs, contextSnippet, candidat
 // ---------------------------------------------------------------------------
 
 async function main() {
-  if (!process.env.GEMINI_API_KEY) {
-    log.warn('GEMINI_API_KEY not set — skipping company discovery');
-    process.exit(0);
-  }
+  // Claude CLI is always available in this environment; no API key check needed.
 
   const t = log.timer();
   const discoveryConfig = getDiscoveryConfig();

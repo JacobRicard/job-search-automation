@@ -200,6 +200,14 @@ async function main() {
     return;
   }
 
+  // Load .env before the setup check so DATA_DIR is available
+  loadDashboardEnv(repoRoot);
+
+  const { checkSetup } = require('../lib/setup-check');
+  if (!checkSetup(repoRoot)) {
+    process.exit(1);
+  }
+
   const runStart = Date.now();
   const active = loadActiveProfileEnv(repoRoot);
 

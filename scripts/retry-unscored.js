@@ -24,7 +24,7 @@ function parseLimit(argv) {
 }
 
 async function run() {
-  if (!process.env.OLLAMA_HOST) requireEnv('GROQ_API_KEY');
+  if (!process.env.OLLAMA_HOST && !process.env.CLAUDE_CODE_EXECPATH) requireEnv('GROQ_API_KEY');
 
   const limit = parseLimit(process.argv.slice(2));
   const db = getDb();
