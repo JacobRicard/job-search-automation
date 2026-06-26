@@ -13,6 +13,9 @@ const { loadDashboardEnv } = require('./lib/env');
 
 loadDashboardEnv(__dirname);
 
+const { checkSetup } = require('./lib/setup-check');
+if (!checkSetup(__dirname)) process.exit(1);
+
 const { jobsJsonPath } = require('./config/paths');
 const logPaths = require('./lib/log-paths');
 const log = require('./lib/logger')('scraper', { logFile: logPaths.daily('scraper') });
